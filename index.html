@@ -115,29 +115,52 @@
         // Цвета жуков по рядам
         const bugColors = ['#ff5e7e', '#ff9f45', '#ffe14a', '#7cff6b', '#6bd5ff'];
 
-        // Пиксельные спрайты жуков (как в оригинальном Space Invaders), 2 кадра анимации
-        const invaderFrames = [
+        // Пиксельные спрайты жуков, 2 кадра анимации (мельче клетки + детали).
+        // Символы: X тело, D тень, L блик, e глаз, '.' прозрачно. Цвет тела — по ряду.
+        const bugFrames = [
             [
-                '00100000100',
-                '10010001001',
-                '10111111101',
-                '11101110111',
-                '11111111111',
-                '01111111110',
-                '00100000100',
-                '01000000010'
+                '....X...X....',
+                '.....X.X.....',
+                '....XXXXX....',
+                '....eXXXe....',
+                '...XXXXXXX...',
+                '...XXXXXXX...',
+                '...XDDDDDX...',
+                '...XLLLLLX...',
+                '...XXXXXXX...',
+                '..X..X.X..X..',
+                '.X...X.X...X.'
             ],
             [
-                '00100000100',
-                '00010001000',
-                '00111111100',
-                '01101110110',
-                '11111111111',
-                '10111111101',
-                '10100000101',
-                '00011011000'
+                '....X...X....',
+                '.....X.X.....',
+                '....XXXXX....',
+                '....eXXXe....',
+                '...XXXXXXX...',
+                '...XXXXXXX...',
+                '...XDDDDDX...',
+                '...XLLLLLX...',
+                '...XXXXXXX...',
+                '..X.X...X.X..',
+                '..X..X.X..X..'
             ]
         ];
+
+        // Пиксельный спрайт корабля (квадратный, в тон жукам).
+        // H корпус, C кабина, F дюза, '.' прозрачно.
+        const shipFrame = [
+            '......H......',
+            '.....HHH.....',
+            '....HHHHH....',
+            '....HCCCH....',
+            '...HHCCCHH...',
+            '..HHHHHHHHH..',
+            '.HHHHHHHHHHH.',
+            'HHH.HHHHH.HHH',
+            'HH...HHH...HH',
+            '.....F.F.....'
+        ];
+        const shipPalette = { 'H': '#c2c8e0', 'C': '#1b9dff', 'F': '#ff9d00', '.': null };
 
         // ===== Звук (Web Audio, синтез без файлов) =====
         let audioCtx = null;
@@ -483,85 +506,73 @@
 
         // ===== Рисование объектов =====
 
-        // Космический корабль игрока
-        function drawShip(p) {
-            const cx = p.x + p.width / 2;
-            const t = performance.now();
-            const flame = 6 + Math.abs(Math.sin(t / 40)) * 8;
-
-            // Пламя из дюз
-            ctx.save();
-            ctx.shadowColor = '#ffae00';
-            ctx.shadowBlur = 18;
-            const grad = ctx.createLinearGradient(0, p.y + p.height, 0, p.y + p.height + flame + 6);
-            grad.addColorStop(0, '#fff3b0');
-            grad.addColorStop(0.5, '#ff9d00');
-            grad.addColorStop(1, 'rgba(255, 60, 0, 0)');
-            ctx.fillStyle = grad;
-            for (const off of [-0.25, 0.25]) {
-                const fx = cx + p.width * off;
-                ctx.beginPath();
-                ctx.moveTo(fx - 5, p.y + p.height);
-                ctx.lineTo(fx + 5, p.y + p.height);
-                ctx.lineTo(fx, p.y + p.height + flame + 6);
-                ctx.closePath();
-                ctx.fill();
-            }
-            ctx.restore();
-
-            // Корпус
-            ctx.save();
-            ctx.shadowColor = '#39ff14';
-            ctx.shadowBlur = 12;
-            ctx.fillStyle = '#cfe9ff';
-            ctx.beginPath();
-            ctx.moveTo(cx, p.y);                                   // нос
-            ctx.lineTo(p.x + p.width * 0.80, p.y + p.height * 0.55);
-            ctx.lineTo(p.x + p.width, p.y + p.height);             // правое крыло
-            ctx.lineTo(p.x + p.width * 0.62, p.y + p.height * 0.80);
-            ctx.lineTo(p.x + p.width * 0.38, p.y + p.height * 0.80);
-            ctx.lineTo(p.x, p.y + p.height);                       // левое крыло
-            ctx.lineTo(p.x + p.width * 0.20, p.y + p.height * 0.55);
-            ctx.closePath();
-            ctx.fill();
-            ctx.restore();
-
-            // Кабина
-            ctx.fillStyle = '#1b9dff';
-            ctx.beginPath();
-            ctx.ellipse(cx, p.y + p.height * 0.46, p.width * 0.12, p.height * 0.24, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = 'rgba(255,255,255,0.7)';
-            ctx.beginPath();
-            ctx.ellipse(cx - 2, p.y + p.height * 0.40, p.width * 0.04, p.height * 0.08, 0, 0, Math.PI * 2);
-            ctx.fill();
+        // Затемнение / осветление hex-цвета (f<1 темнее, f>1 светлее)
+        function shade(hex, f) {
+            const n = parseInt(hex.slice(1), 16);
+            const r = Math.max(0, Math.min(255, Math.round(((n >> 16) & 255) * f)));
+            const g = Math.max(0, Math.min(255, Math.round(((n >> 8) & 255) * f)));
+            const b = Math.max(0, Math.min(255, Math.round((n & 255) * f)));
+            return `rgb(${r},${g},${b})`;
         }
 
-        // Жук-враг — пиксельный спрайт (квадратные клетки, как в оригинале)
-        function drawBug(e) {
-            // Кадр анимации: все жуки переключаются в унисон
-            const pattern = invaderFrames[Math.floor(performance.now() / 450) % invaderFrames.length];
-            const cols = pattern[0].length;
-            const rows = pattern.length;
-            const cell = Math.min(e.width / cols, e.height / rows);
-            const offsetX = e.x + (e.width - cell * cols) / 2;
-            const offsetY = e.y + (e.height - cell * rows) / 2;
-            const color = bugColors[e.row % bugColors.length];
-
+        // Универсальный рендер пиксельного спрайта по сетке символов и палитре
+        function drawSprite(grid, palette, x, y, w, h, glow) {
+            const cols = grid[0].length;
+            const rows = grid.length;
+            const cell = Math.min(w / cols, h / rows);
+            const ox = x + (w - cell * cols) / 2;
+            const oy = y + (h - cell * rows) / 2;
             ctx.save();
-            ctx.shadowColor = color;
-            ctx.shadowBlur = 6;
-            ctx.fillStyle = color;
+            if (glow) {
+                ctx.shadowColor = glow.color;
+                ctx.shadowBlur = glow.blur;
+            }
             for (let r = 0; r < rows; r++) {
-                const line = pattern[r];
+                const line = grid[r];
                 for (let c = 0; c < cols; c++) {
-                    if (line[c] === '1') {
+                    const color = palette[line[c]];
+                    if (color) {
+                        ctx.fillStyle = color;
                         // +0.5 убирает зазоры между клетками при дробном масштабе
-                        ctx.fillRect(offsetX + c * cell, offsetY + r * cell, cell + 0.5, cell + 0.5);
+                        ctx.fillRect(ox + c * cell, oy + r * cell, cell + 0.5, cell + 0.5);
                     }
                 }
             }
             ctx.restore();
+            return { cell, ox, oy, cols, rows };
+        }
+
+        // Космический корабль игрока — квадратный пиксельный спрайт
+        function drawShip(p) {
+            const s = drawSprite(shipFrame, shipPalette, p.x, p.y, p.width, p.height, null);
+
+            // Пламя из дюз — мигающие пиксельные блоки под двигателями
+            ctx.save();
+            ctx.shadowColor = '#ff9d00';
+            ctx.shadowBlur = 6;
+            const flick = Math.floor(performance.now() / 90) % 2;
+            for (const col of [5, 7]) {
+                const len = 1 + flick + (Math.random() < 0.5 ? 1 : 0);
+                for (let k = 0; k < len; k++) {
+                    ctx.fillStyle = k === 0 ? '#ffd27c' : '#ff6a00';
+                    ctx.fillRect(s.ox + col * s.cell, s.oy + (s.rows + k) * s.cell, s.cell + 0.5, s.cell + 0.5);
+                }
+            }
+            ctx.restore();
+        }
+
+        // Жук-враг — детальный пиксельный спрайт, цвет по ряду, без яркого свечения
+        function drawBug(e) {
+            const frame = bugFrames[Math.floor(performance.now() / 450) % bugFrames.length];
+            const base = bugColors[e.row % bugColors.length];
+            const palette = {
+                'X': base,
+                'D': shade(base, 0.55),   // тень
+                'L': shade(base, 1.35),   // блик
+                'e': '#ffffff',           // глаз
+                '.': null
+            };
+            drawSprite(frame, palette, e.x, e.y, e.width, e.height, null);
         }
 
         function drawBackground() {
@@ -672,6 +683,7 @@
         // Конец игры
         function showGameOver() {
             gameRunning = false;
+            startButton.textContent = 'Начать игру';
         }
 
         // Обработчик нажатия клавиш
