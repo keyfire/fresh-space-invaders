@@ -85,7 +85,7 @@
         <h1>КОСМИЧЕСКИЕ ЖУКИ</h1>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div class="score">Счёт: <span id="score">0</span> &nbsp;|&nbsp; Жизни: <span id="lives" class="lives">3</span> &nbsp;|&nbsp; Уровень: <span id="level" class="level">1</span></div>
-        <div class="controls">Клавиши: ← → и Пробел &nbsp;·&nbsp; Мышь: курсор и клик &nbsp;·&nbsp; Телефон: палец и тап</div>
+        <div class="controls">Клавиши: ← → и Пробел &nbsp;·&nbsp; Мышь: курсор и клик &nbsp;·&nbsp; Телефон: палец и тап &nbsp;·&nbsp; Пауза: кнопка или Esc</div>
         <button id="startButton">Начать игру</button>
     </div>
 
@@ -119,6 +119,7 @@
         let level = 1;
         let gameRunning = false;
         let gameOver = false;
+        let paused = false;
         let enemyDirection = 1; // 1 - вправо, -1 - влево
         let enemySpeed = 1;
         let enemyMoveDownTimer = 0;
@@ -250,7 +251,7 @@
             playerHeight = Math.round(playerWidth * 0.6);
             bulletWidth = Math.max(3, Math.round(W * 0.006));
             bulletHeight = Math.max(10, Math.round(H * 0.025));
-            enemyStep = Math.round(enemyHeight * 0.45);
+            enemyStep = Math.round(enemyHeight * 0.35);
         }
 
         // Пропорциональный перенос объектов при изменении размера холста
@@ -307,9 +308,9 @@
                 });
             }
         }
-        function updateStars() {
+        function updateStars(dt) {
             for (const s of stars) {
-                s.y += s.speed;
+                s.y += s.speed * dt;
                 if (s.y > canvas.height) {
                     s.y = 0;
                     s.x = Math.random() * canvas.width;
@@ -331,13 +332,13 @@
                 });
             }
         }
-        function updateParticles() {
+        function updateParticles(dt) {
             for (let i = particles.length - 1; i >= 0; i--) {
                 const p = particles[i];
-                p.x += p.vx;
-                p.y += p.vy;
-                p.vy += 0.06;
-                p.life -= 0.03;
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.vy += 0.06 * dt;
+                p.life -= 0.03 * dt;
                 if (p.life <= 0) particles.splice(i, 1);
             }
         }
@@ -377,7 +378,7 @@
             particles = [];
 
             // Скорость и темп стрельбы растут с каждым уровнем
-            enemySpeed = (1 + (level - 1) * 0.4) * unit;
+            enemySpeed = (0.7 + (level - 1) * 0.35) * unit;
             enemyShootInterval = Math.max(350, 1000 - (level - 1) * 90);
 
             // Сбрасываем флаги уровня
@@ -415,12 +416,15 @@
         function loop(currentTime) {
             const deltaTime = currentTime - lastTime;
             lastTime = currentTime;
+            // Нормировка к 60 fps: на 120 Гц экранах (iPhone Pro) кадров вдвое больше,
+            // поэтому движение считаем по времени, а не по числу кадров
+            const dt = Math.min(deltaTime / 16.6667, 3);
 
-            updateStars();
-            updateParticles();
+            updateStars(dt);
+            updateParticles(dt);
 
-            if (gameRunning && !gameOver) {
-                update(deltaTime);
+            if (gameRunning && !gameOver && !paused) {
+                update(deltaTime, dt);
             }
 
             draw();
@@ -428,18 +432,18 @@
         }
 
         // Обновление состояния игры
-        function update(deltaTime) {
+        function update(deltaTime, dt) {
             // Обработка движения игрока
             if (keys.left && player.x > 0) {
-                player.x -= player.speed;
+                player.x -= player.speed * dt;
             }
             if (keys.right && player.x < canvas.width - player.width) {
-                player.x += player.speed;
+                player.x += player.speed * dt;
             }
 
             // Обновление пуль игрока
             for (let i = bullets.length - 1; i >= 0; i--) {
-                bullets[i].y -= 7 * unit;
+                bullets[i].y -= 7 * unit * dt;
 
                 // Удаляем пули, вышедшие за границы
                 if (bullets[i].y < 0) {
@@ -493,7 +497,7 @@
             // Двигаем врагов
             for (let i = 0; i < enemies.length; i++) {
                 if (enemies[i].alive) {
-                    enemies[i].x += enemyDirection * enemySpeed;
+                    enemies[i].x += enemyDirection * enemySpeed * dt;
                     if (moveDown) {
                         enemies[i].y += enemyStep;
                     }
@@ -533,7 +537,7 @@
 
             // Обновление пуль врагов
             for (let i = enemyBullets.length - 1; i >= 0; i--) {
-                enemyBullets[i].y += 5 * unit;
+                enemyBullets[i].y += 5 * unit * dt;
 
                 // Удаляем пули, вышедшие за границы
                 if (enemyBullets[i].y > canvas.height) {
@@ -564,7 +568,7 @@
 
         // Выстрел игрока
         function shootPlayerBullet() {
-            if (!gameRunning || gameOver || !player.width) return;
+            if (!gameRunning || gameOver || paused || !player.width) return;
             bullets.push({
                 x: player.x + player.width / 2 - bulletWidth / 2,
                 y: player.y - bulletHeight,
@@ -747,6 +751,24 @@
             // Частицы взрывов
             drawParticles();
 
+            // Оверлей паузы
+            if (paused && !gameOver) {
+                const pSize = Math.round(canvas.width * 0.07);
+                ctx.fillStyle = 'rgba(5, 5, 15, 0.55)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#7cf6ff';
+                ctx.font = `bold ${pSize}px Segoe UI, Arial`;
+                ctx.textAlign = 'center';
+                ctx.shadowColor = '#1b9dff';
+                ctx.shadowBlur = 18;
+                ctx.fillText('ПАУЗА', canvas.width / 2, canvas.height / 2 - pSize * 0.3);
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#cfd3f5';
+                ctx.font = `${Math.round(pSize * 0.4)}px Segoe UI, Arial`;
+                ctx.fillText('«Продолжить» или Esc', canvas.width / 2, canvas.height / 2 + pSize * 0.6);
+                ctx.textAlign = 'left';
+            }
+
             // Если игра окончена, показываем сообщение
             if (gameOver) {
                 const bigSize = Math.round(canvas.width * 0.065);
@@ -797,6 +819,13 @@
                     shootPlayerBullet();
                     e.preventDefault();
                     break;
+                case 'Escape':
+                case 'p':
+                case 'P':
+                case 'з':
+                case 'З':
+                    togglePause();
+                    break;
             }
         });
 
@@ -818,7 +847,7 @@
         // ===== Управление мышкой =====
         // Корабль следует за курсором по горизонтали (с учётом масштаба канваса)
         canvas.addEventListener('mousemove', function(e) {
-            if (!gameRunning || gameOver || !player.width) return;
+            if (!gameRunning || gameOver || paused || !player.width) return;
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const mouseX = (e.clientX - rect.left) * scaleX;
@@ -838,7 +867,7 @@
 
         // Сенсорное управление для мобильных
         canvas.addEventListener('touchmove', function(e) {
-            if (!gameRunning || gameOver || !player.width || e.touches.length === 0) return;
+            if (!gameRunning || gameOver || paused || !player.width || e.touches.length === 0) return;
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const touchX = (e.touches[0].clientX - rect.left) * scaleX;
@@ -854,12 +883,22 @@
             e.preventDefault();
         }, { passive: false });
 
-        // Обработчик кнопки "Начать игру"
+        // Пауза / продолжение
+        function togglePause() {
+            if (!gameRunning || gameOver) return;
+            paused = !paused;
+            startButton.textContent = paused ? 'Продолжить' : 'Пауза';
+        }
+
+        // Обработчик кнопки: старт, либо пауза/продолжение во время игры
         startButton.addEventListener('click', function() {
             initAudio();
             if (!gameRunning || gameOver) {
                 startGame();
-                startButton.textContent = 'Игра идёт...';
+                paused = false;
+                startButton.textContent = 'Пауза';
+            } else {
+                togglePause();
             }
         });
 
