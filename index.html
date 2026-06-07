@@ -40,6 +40,7 @@
         }
         .score span { color: #7cffa1; }
         .score .lives { color: #ff7c9c; }
+        .score .level { color: #ffd166; }
         .controls {
             margin-top: 12px;
             font-size: 14px;
@@ -67,7 +68,7 @@
     <div class="game-container">
         <h1>КОСМИЧЕСКИЕ ЖУКИ</h1>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
-        <div class="score">Счёт: <span id="score">0</span> &nbsp;|&nbsp; Жизни: <span id="lives" class="lives">3</span></div>
+        <div class="score">Счёт: <span id="score">0</span> &nbsp;|&nbsp; Жизни: <span id="lives" class="lives">3</span> &nbsp;|&nbsp; Уровень: <span id="level" class="level">1</span></div>
         <div class="controls">Клавиши: ← → – движение, Пробел – выстрел &nbsp;|&nbsp; Мышь: курсор – движение, клик – выстрел</div>
         <button id="startButton">Начать игру</button>
     </div>
@@ -77,6 +78,7 @@
         const ctx = canvas.getContext('2d');
         const scoreElement = document.getElementById('score');
         const livesElement = document.getElementById('lives');
+        const levelElement = document.getElementById('level');
         const startButton = document.getElementById('startButton');
 
         // Игровые параметры
@@ -96,6 +98,7 @@
         let enemyBullets = [];
         let score = 0;
         let lives = 3;
+        let level = 1;
         let gameRunning = false;
         let gameOver = false;
         let enemyDirection = 1; // 1 - вправо, -1 - влево
@@ -111,6 +114,30 @@
 
         // Цвета жуков по рядам
         const bugColors = ['#ff5e7e', '#ff9f45', '#ffe14a', '#7cff6b', '#6bd5ff'];
+
+        // Пиксельные спрайты жуков (как в оригинальном Space Invaders), 2 кадра анимации
+        const invaderFrames = [
+            [
+                '00100000100',
+                '10010001001',
+                '10111111101',
+                '11101110111',
+                '11111111111',
+                '01111111110',
+                '00100000100',
+                '01000000010'
+            ],
+            [
+                '00100000100',
+                '00010001000',
+                '00111111100',
+                '01101110110',
+                '11111111111',
+                '10111111101',
+                '10100000101',
+                '00011011000'
+            ]
+        ];
 
         // ===== Звук (Web Audio, синтез без файлов) =====
         let audioCtx = null;
@@ -211,8 +238,8 @@
             }
         }
 
-        // Инициализация игры
-        function initGame() {
+        // Создание уровня (игрок + строй врагов). Счёт и жизни НЕ сбрасываются.
+        function spawnLevel() {
             // Создаем игрока
             player = {
                 x: canvas.width / 2 - playerWidth / 2,
@@ -242,24 +269,39 @@
             enemyBullets = [];
             particles = [];
 
-            // Сбрасываем счет и жизни
-            score = 0;
-            lives = 3;
-            updateScore();
+            // Скорость и темп стрельбы растут с каждым уровнем
+            enemySpeed = 1 + (level - 1) * 0.4;
+            enemyShootInterval = Math.max(350, 1000 - (level - 1) * 90);
 
-            // Сбрасываем флаги
+            // Сбрасываем флаги уровня
             gameRunning = true;
             gameOver = false;
             enemyDirection = 1;
-            enemySpeed = 1;
             enemyMoveDownTimer = 0;
             enemyShootTimer = 0;
+        }
+
+        // Новая игра с первого уровня
+        function startGame() {
+            score = 0;
+            lives = 3;
+            level = 1;
+            updateScore();
+            spawnLevel();
+        }
+
+        // Следующий уровень — ускорение, счёт и жизни сохраняются
+        function nextLevel() {
+            level++;
+            spawnLevel();
+            updateScore();
         }
 
         // Обновление счета
         function updateScore() {
             scoreElement.textContent = score;
             livesElement.textContent = lives;
+            levelElement.textContent = level;
         }
 
         // Единый цикл: звёзды и частицы живут всегда, логика — только в игре
@@ -360,9 +402,8 @@
             }
 
             if (allDead) {
-                // Новый уровень
-                enemySpeed += 0.5;
-                initGame();
+                // Следующий уровень — ускорение и более частая стрельба
+                nextLevel();
                 return;
             }
 
@@ -496,84 +537,31 @@
             ctx.fill();
         }
 
-        // Жук-враг
+        // Жук-враг — пиксельный спрайт (квадратные клетки, как в оригинале)
         function drawBug(e) {
-            const cx = e.x + e.width / 2;
-            const cy = e.y + e.height / 2;
-            const t = performance.now();
-            const wob = Math.sin(t / 160 + e.x * 0.05) * 2;
+            // Кадр анимации: все жуки переключаются в унисон
+            const pattern = invaderFrames[Math.floor(performance.now() / 450) % invaderFrames.length];
+            const cols = pattern[0].length;
+            const rows = pattern.length;
+            const cell = Math.min(e.width / cols, e.height / rows);
+            const offsetX = e.x + (e.width - cell * cols) / 2;
+            const offsetY = e.y + (e.height - cell * rows) / 2;
             const color = bugColors[e.row % bugColors.length];
 
             ctx.save();
             ctx.shadowColor = color;
-            ctx.shadowBlur = 8;
-
-            // Лапки (анимированные)
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 2;
-            for (const side of [-1, 1]) {
-                for (let k = 0; k < 3; k++) {
-                    ctx.beginPath();
-                    ctx.moveTo(cx, cy);
-                    ctx.lineTo(
-                        cx + side * e.width * 0.5,
-                        cy - e.height * 0.18 + k * e.height * 0.28 + (k % 2 ? wob : -wob)
-                    );
-                    ctx.stroke();
+            ctx.shadowBlur = 6;
+            ctx.fillStyle = color;
+            for (let r = 0; r < rows; r++) {
+                const line = pattern[r];
+                for (let c = 0; c < cols; c++) {
+                    if (line[c] === '1') {
+                        // +0.5 убирает зазоры между клетками при дробном масштабе
+                        ctx.fillRect(offsetX + c * cell, offsetY + r * cell, cell + 0.5, cell + 0.5);
+                    }
                 }
             }
-
-            // Тело
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.ellipse(cx, cy + e.height * 0.08, e.width * 0.32, e.height * 0.40, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Полоса на спинке
-            ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(cx, cy - e.height * 0.28);
-            ctx.lineTo(cx, cy + e.height * 0.46);
-            ctx.stroke();
-
-            // Голова
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.ellipse(cx, cy - e.height * 0.36, e.width * 0.22, e.height * 0.20, 0, 0, Math.PI * 2);
-            ctx.fill();
-
-            // Усики
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 1.5;
-            for (const side of [-1, 1]) {
-                ctx.beginPath();
-                ctx.moveTo(cx, cy - e.height * 0.48);
-                ctx.quadraticCurveTo(
-                    cx + side * e.width * 0.22, cy - e.height * 0.72,
-                    cx + side * e.width * 0.30, cy - e.height * 0.55
-                );
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.arc(cx + side * e.width * 0.30, cy - e.height * 0.55, 1.8, 0, Math.PI * 2);
-                ctx.fillStyle = color;
-                ctx.fill();
-            }
             ctx.restore();
-
-            // Глаза
-            ctx.fillStyle = '#ffffff';
-            for (const side of [-1, 1]) {
-                ctx.beginPath();
-                ctx.arc(cx + side * e.width * 0.09, cy - e.height * 0.36, 2.6, 0, Math.PI * 2);
-                ctx.fill();
-            }
-            ctx.fillStyle = '#111';
-            for (const side of [-1, 1]) {
-                ctx.beginPath();
-                ctx.arc(cx + side * e.width * 0.09, cy - e.height * 0.36, 1.2, 0, Math.PI * 2);
-                ctx.fill();
-            }
         }
 
         function drawBackground() {
@@ -770,7 +758,7 @@
         startButton.addEventListener('click', function() {
             initAudio();
             if (!gameRunning || gameOver) {
-                initGame();
+                startGame();
                 startButton.textContent = 'Игра идёт...';
             }
         });
