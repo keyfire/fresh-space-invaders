@@ -377,8 +377,20 @@
             enemyBullets = [];
             particles = [];
 
-            // Скорость и темп стрельбы растут с каждым уровнем
-            enemySpeed = (0.7 + (level - 1) * 0.35) * unit;
+            // Скорость задаётся так, чтобы строй пересекал свободное поле за фиксированное
+            // время — тогда темп одинаков и в широком альбомном, и в узком портретном холсте.
+            // С уровнем поле пересекается быстрее.
+            const margin = 10 * unit;
+            const travelRoom = Math.max(40, canvas.width - formationW - 2 * margin);
+            const traverseSec = Math.max(0.7, 1.6 - (level - 1) * 0.18);
+            enemySpeed = travelRoom / (traverseSec * 60);   // px за кадр (при 60 fps), далее * dt
+
+            // Шаг спуска привязан к расстоянию до игрока: фиксированное число «ступеней»,
+            // поэтому время до игрока одинаково на коротком и высоком холсте.
+            const formationBottom = startY + enemyRows * (enemyHeight + enemySpacing) - enemySpacing;
+            const desiredSteps = Math.max(10, 22 - (level - 1) * 2);
+            enemyStep = Math.max(6, Math.round((player.y - formationBottom) / desiredSteps));
+
             enemyShootInterval = Math.max(350, 1000 - (level - 1) * 90);
 
             // Сбрасываем флаги уровня
