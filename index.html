@@ -2,25 +2,38 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Космические жуки</title>
     <style>
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
         body {
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
+            min-height: 100dvh;
             margin: 0;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+            box-sizing: border-box;
             background: radial-gradient(circle at 50% 0%, #16163a 0%, #05050f 70%);
             font-family: 'Segoe UI', Arial, sans-serif;
             color: #e8e8ff;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
         }
         .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             text-align: center;
+            max-width: 100%;
         }
         h1 {
-            margin: 0 0 12px;
-            font-size: 28px;
+            margin: 0 0 8px;
+            font-size: clamp(18px, 5vw, 28px);
             letter-spacing: 3px;
             color: #7cf6ff;
             text-shadow: 0 0 12px #1b9dff, 0 0 24px #1b9dff;
@@ -31,10 +44,12 @@
             background-color: #05050f;
             box-shadow: 0 0 25px rgba(43, 209, 255, 0.45), inset 0 0 40px rgba(20, 20, 60, 0.6);
             max-width: 100%;
+            touch-action: none;
+            display: block;
         }
         .score {
-            margin-top: 14px;
-            font-size: 22px;
+            margin-top: 10px;
+            font-size: clamp(15px, 4vw, 22px);
             font-weight: bold;
             text-shadow: 0 0 8px rgba(124, 246, 255, 0.6);
         }
@@ -42,12 +57,13 @@
         .score .lives { color: #ff7c9c; }
         .score .level { color: #ffd166; }
         .controls {
-            margin-top: 12px;
-            font-size: 14px;
+            margin-top: 8px;
+            font-size: clamp(11px, 3vw, 14px);
             color: #9aa0c8;
+            max-width: 95vw;
         }
         button {
-            margin-top: 14px;
+            margin-top: 10px;
             padding: 10px 22px;
             font-size: 16px;
             cursor: pointer;
@@ -69,7 +85,7 @@
         <h1>КОСМИЧЕСКИЕ ЖУКИ</h1>
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div class="score">Счёт: <span id="score">0</span> &nbsp;|&nbsp; Жизни: <span id="lives" class="lives">3</span> &nbsp;|&nbsp; Уровень: <span id="level" class="level">1</span></div>
-        <div class="controls">Клавиши: ← → – движение, Пробел – выстрел &nbsp;|&nbsp; Мышь: курсор – движение, клик – выстрел</div>
+        <div class="controls">Клавиши: ← → и Пробел &nbsp;·&nbsp; Мышь: курсор и клик &nbsp;·&nbsp; Телефон: палец и тап</div>
         <button id="startButton">Начать игру</button>
     </div>
 
@@ -81,16 +97,18 @@
         const levelElement = document.getElementById('level');
         const startButton = document.getElementById('startButton');
 
-        // Игровые параметры
-        const playerWidth = 50;
-        const playerHeight = 30;
-        const enemyWidth = 40;
-        const enemyHeight = 30;
-        const bulletWidth = 4;
-        const bulletHeight = 15;
-        const enemyRows = 5;
-        const enemyCols = 10;
-        const enemySpacing = 10;
+        // Игровые параметры — пересчитываются под размер холста (см. computeLayout)
+        let playerWidth = 50;
+        let playerHeight = 30;
+        let enemyWidth = 40;
+        let enemyHeight = 30;
+        let bulletWidth = 4;
+        let bulletHeight = 15;
+        let enemyRows = 5;
+        let enemyCols = 10;
+        let enemySpacing = 10;
+        let enemyStep = 20;   // шаг строя вниз
+        let unit = 1;         // масштаб скоростей относительно эталона (высота 600)
 
         let player = {};
         let enemies = [];
@@ -214,6 +232,69 @@
             o.start(t); o.stop(t + 0.3);
         }
 
+        // ===== Адаптация под размер экрана (в т.ч. портрет iPhone) =====
+        // Пересчёт игровых размеров от текущего холста
+        function computeLayout() {
+            const W = canvas.width, H = canvas.height;
+            unit = H / 600;
+            const portrait = H > W;
+            enemyRows = 5;
+            enemyCols = portrait ? 6 : 10;           // в портрете строй уже
+            enemySpacing = Math.max(6, Math.round(W * 0.014));
+            // Строй занимает ~72% ширины — остаётся место для движения вбок,
+            // иначе он отскакивает от стенок каждый кадр и слишком быстро падает вниз
+            const usableW = W * 0.72;
+            enemyWidth = Math.floor((usableW - enemySpacing * (enemyCols - 1)) / enemyCols);
+            enemyHeight = Math.round(enemyWidth * 0.78);
+            playerWidth = Math.round(enemyWidth * 1.25);
+            playerHeight = Math.round(playerWidth * 0.6);
+            bulletWidth = Math.max(3, Math.round(W * 0.006));
+            bulletHeight = Math.max(10, Math.round(H * 0.025));
+            enemyStep = Math.round(enemyHeight * 0.45);
+        }
+
+        // Пропорциональный перенос объектов при изменении размера холста
+        function rescaleEntities(oldW, oldH) {
+            if (!oldW || !oldH) { initStars(); return; }
+            const sx = canvas.width / oldW, sy = canvas.height / oldH;
+            if (player && player.width) {
+                player.x *= sx;
+                player.width = playerWidth;
+                player.height = playerHeight;
+                player.y = canvas.height - playerHeight - Math.round(canvas.height * 0.04);
+                player.speed = 5 * unit;
+                player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+            }
+            for (const e of enemies) { e.x *= sx; e.y *= sy; e.width = enemyWidth; e.height = enemyHeight; }
+            for (const b of bullets) { b.x *= sx; b.y *= sy; }
+            for (const b of enemyBullets) { b.x *= sx; b.y *= sy; }
+            initStars();
+        }
+
+        // Подгонка холста под доступное место (с учётом плотности пикселей)
+        function fitCanvas() {
+            const oldW = canvas.width, oldH = canvas.height;
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const reserved = 170; // место под заголовок, счёт, подсказку и кнопку
+            const availW = Math.max(240, window.innerWidth - 12);
+            const availH = Math.max(320, window.innerHeight - reserved);
+            const portrait = window.innerHeight > window.innerWidth;
+            let cssW, cssH;
+            if (portrait) {
+                cssW = availW;
+                cssH = availH;
+            } else {
+                cssW = Math.min(availW, 900);   // на десктопе не растягиваем на весь монитор
+                cssH = Math.min(availH, 680);
+            }
+            canvas.style.width = cssW + 'px';
+            canvas.style.height = cssH + 'px';
+            canvas.width = Math.round(cssW * dpr);
+            canvas.height = Math.round(cssH * dpr);
+            computeLayout();
+            rescaleEntities(oldW, oldH);
+        }
+
         // ===== Звёздное небо =====
         function initStars() {
             stars = [];
@@ -266,19 +347,22 @@
             // Создаем игрока
             player = {
                 x: canvas.width / 2 - playerWidth / 2,
-                y: canvas.height - playerHeight - 20,
+                y: canvas.height - playerHeight - Math.round(canvas.height * 0.04),
                 width: playerWidth,
                 height: playerHeight,
-                speed: 5
+                speed: 5 * unit
             };
 
-            // Создаем врагов
+            // Создаем врагов (строй центрируется по ширине холста)
+            const formationW = enemyCols * enemyWidth + (enemyCols - 1) * enemySpacing;
+            const startX = (canvas.width - formationW) / 2;
+            const startY = Math.round(canvas.height * 0.08);
             enemies = [];
             for (let row = 0; row < enemyRows; row++) {
                 for (let col = 0; col < enemyCols; col++) {
                     enemies.push({
-                        x: col * (enemyWidth + enemySpacing) + 50,
-                        y: row * (enemyHeight + enemySpacing) + 50,
+                        x: startX + col * (enemyWidth + enemySpacing),
+                        y: startY + row * (enemyHeight + enemySpacing),
                         width: enemyWidth,
                         height: enemyHeight,
                         alive: true,
@@ -293,7 +377,7 @@
             particles = [];
 
             // Скорость и темп стрельбы растут с каждым уровнем
-            enemySpeed = 1 + (level - 1) * 0.4;
+            enemySpeed = (1 + (level - 1) * 0.4) * unit;
             enemyShootInterval = Math.max(350, 1000 - (level - 1) * 90);
 
             // Сбрасываем флаги уровня
@@ -355,7 +439,7 @@
 
             // Обновление пуль игрока
             for (let i = bullets.length - 1; i >= 0; i--) {
-                bullets[i].y -= 7;
+                bullets[i].y -= 7 * unit;
 
                 // Удаляем пули, вышедшие за границы
                 if (bullets[i].y < 0) {
@@ -400,7 +484,8 @@
             }
 
             // Проверяем, нужно ли двигаться вниз
-            if (rightmost >= canvas.width - 10 || leftmost <= 10) {
+            const margin = 10 * unit;
+            if (rightmost >= canvas.width - margin || leftmost <= margin) {
                 enemyDirection *= -1;
                 moveDown = true;
             }
@@ -410,7 +495,7 @@
                 if (enemies[i].alive) {
                     enemies[i].x += enemyDirection * enemySpeed;
                     if (moveDown) {
-                        enemies[i].y += 20;
+                        enemies[i].y += enemyStep;
                     }
                 }
             }
@@ -448,7 +533,7 @@
 
             // Обновление пуль врагов
             for (let i = enemyBullets.length - 1; i >= 0; i--) {
-                enemyBullets[i].y += 5;
+                enemyBullets[i].y += 5 * unit;
 
                 // Удаляем пули, вышедшие за границы
                 if (enemyBullets[i].y > canvas.height) {
@@ -614,16 +699,17 @@
             // Экран меню (до старта)
             if (!gameRunning && !gameOver) {
                 drawParticles();
+                const titleSize = Math.round(canvas.width * 0.06);
                 ctx.fillStyle = '#7cf6ff';
-                ctx.font = 'bold 44px Segoe UI, Arial';
+                ctx.font = `bold ${titleSize}px Segoe UI, Arial`;
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#1b9dff';
                 ctx.shadowBlur = 20;
-                ctx.fillText('КОСМИЧЕСКИЕ ЖУКИ', canvas.width / 2, canvas.height / 2 - 30);
+                ctx.fillText('КОСМИЧЕСКИЕ ЖУКИ', canvas.width / 2, canvas.height / 2 - titleSize);
                 ctx.shadowBlur = 0;
-                ctx.font = '20px Segoe UI, Arial';
+                ctx.font = `${Math.round(titleSize * 0.5)}px Segoe UI, Arial`;
                 ctx.fillStyle = '#cfd3f5';
-                ctx.fillText('Нажмите «Начать игру»', canvas.width / 2, canvas.height / 2 + 20);
+                ctx.fillText('Нажмите «Начать игру»', canvas.width / 2, canvas.height / 2);
                 ctx.textAlign = 'left';
                 return;
             }
@@ -663,19 +749,21 @@
 
             // Если игра окончена, показываем сообщение
             if (gameOver) {
+                const bigSize = Math.round(canvas.width * 0.065);
+                const smallSize = Math.round(canvas.width * 0.032);
                 ctx.fillStyle = 'rgba(5, 5, 15, 0.6)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ff7c9c';
-                ctx.font = 'bold 48px Segoe UI, Arial';
+                ctx.font = `bold ${bigSize}px Segoe UI, Arial`;
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#ff2b5e';
                 ctx.shadowBlur = 18;
-                ctx.fillText('ИГРА ОКОНЧЕНА', canvas.width / 2, canvas.height / 2 - 50);
+                ctx.fillText('ИГРА ОКОНЧЕНА', canvas.width / 2, canvas.height / 2 - bigSize);
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = '#e8e8ff';
-                ctx.font = '24px Segoe UI, Arial';
-                ctx.fillText(`Ваш счёт: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
-                ctx.fillText('Нажмите «Начать игру» для перезапуска', canvas.width / 2, canvas.height / 2 + 60);
+                ctx.font = `${smallSize}px Segoe UI, Arial`;
+                ctx.fillText(`Ваш счёт: ${score}`, canvas.width / 2, canvas.height / 2 + smallSize);
+                ctx.fillText('Нажмите «Начать игру» для перезапуска', canvas.width / 2, canvas.height / 2 + smallSize * 2.5);
                 ctx.textAlign = 'left';
             }
         }
@@ -775,8 +863,12 @@
             }
         });
 
+        // Перестройка холста при изменении размера/повороте экрана
+        window.addEventListener('resize', fitCanvas);
+        window.addEventListener('orientationchange', function() { setTimeout(fitCanvas, 200); });
+
         // Запуск единого цикла анимации
-        initStars();
+        fitCanvas();
         lastTime = performance.now();
         requestAnimationFrame(loop);
     </script>
