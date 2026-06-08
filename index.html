@@ -332,27 +332,28 @@
         const bugColors = ['#ff5e7e', '#ff9f45', '#ffe14a', '#7cff6b', '#6bd5ff'];
 
         // Пять форм пришельцев (по 2 кадра анимации). Меняются каждые 5 раундов
-        // циклично. Символы: X тело, D тень, L блик, e глаз, '.' прозрачно.
+        // циклично; форма 0 (первые раунды) — исходный «стройный» жук.
+        // Символы: X тело, D тень, L блик, e глаз, '.' прозрачно.
         const bugForms = [
-            // 0 — кальмар
+            // 0 — жук (стройный, оригинал)
+            [
+                ['....X...X....', '.....X.X.....', '....XXXXX....', '....eXXXe....', '...XXXXXXX...', '...XXXXXXX...', '...XDDDDDX...', '...XLLLLLX...', '...XXXXXXX...', '..X..X.X..X..', '.X...X.X...X.'],
+                ['....X...X....', '.....X.X.....', '....XXXXX....', '....eXXXe....', '...XXXXXXX...', '...XXXXXXX...', '...XDDDDDX...', '...XLLLLLX...', '...XXXXXXX...', '..X.X...X.X..', '..X..X.X..X..']
+            ],
+            // 1 — кальмар
             [
                 ['...XXXXX...', '..XXXXXXX..', '.XXXXXXXXX.', '.XXeXXXeXX.', '.XXXXXXXXX.', '...X.X.X...', '..X.X.X.X..', '.X.......X.'],
                 ['...XXXXX...', '..XXXXXXX..', '.XXXXXXXXX.', '.XXeXXXeXX.', '.XXXXXXXXX.', '...X.X.X...', '.X.X.X.X.X.', '..X.....X..']
             ],
-            // 1 — краб
+            // 2 — краб
             [
                 ['.X.......X.', '..X.X.X.X..', '.XXXXXXXXX.', 'XXXeXXXeXXX', 'XXXXXXXXXXX', 'X.XXXXXXX.X', 'X.X.....X.X', '...XX.XX...'],
                 ['.X.......X.', '..X.X.X.X..', '.XXXXXXXXX.', 'XXXeXXXeXXX', 'XXXXXXXXXXX', 'X.XXXXXXX.X', '..X.....X..', '.X.X...X.X.']
             ],
-            // 2 — осьминог
+            // 3 — осьминог
             [
                 ['..XXXXXXX..', '.XXXXXXXXX.', 'XXXXXXXXXXX', 'XXeXXXXXeXX', 'XXXXXXXXXXX', 'XXXXXXXXXXX', '.X.X.X.X.X.', 'X..X.X.X..X'],
                 ['..XXXXXXX..', '.XXXXXXXXX.', 'XXXXXXXXXXX', 'XXeXXXXXeXX', 'XXXXXXXXXXX', 'XXXXXXXXXXX', 'X.X.X.X.X.X', '.X..X.X..X.']
-            ],
-            // 3 — жук с усиками
-            [
-                ['..X.....X..', '...X...X...', '..XXXXXXX..', '.XeXXXXXeX.', 'XXXXXXXXXXX', 'XXXDDDDDXXX', 'XXXXXXXXXXX', '.XX..X..XX.'],
-                ['..X.....X..', '...X...X...', '..XXXXXXX..', '.XeXXXXXeX.', 'XXXXXXXXXXX', 'XXXDDDDDXXX', 'XXXXXXXXXXX', 'X.X..X..X.X']
             ],
             // 4 — череп
             [
@@ -364,93 +365,125 @@
         // Боссы — большие детальные версии каждой формы пришельцев. Выбираются
         // по форме предыдущих 5 раундов, поэтому босс «в стиле» этих пришельцев.
         const bossDefs = [
-            // 0 — гигантский кальмар (в тон синим пришельцам)
+            // 0 — гигантский жук (детальный, удвоенное разрешение)
             {
                 frame: [
-                    '......BBB......',
-                    '....BBBBBBB....',
-                    '...BBBBBBBBB...',
-                    '..BBBBBBBBBBB..',
-                    '..BBeeBBBeeBB..',
-                    '..BBeeBBBeeBB..',
-                    '..BBBBBBBBBBB..',
-                    '..LBBBBBBBBBL..',
-                    '...B.B.B.B.B...',
-                    '..B.B.B.B.B.B..',
-                    '.B...B.B.B...B.'
+                    '........LD......LD........',
+                    '........DD......DD........',
+                    '..........LD..LD..........',
+                    '..........LD..LD..........',
+                    '........LLBBLLBBLD........',
+                    '........LBBBBBBBBD........',
+                    '........peBBBBBBpe........',
+                    '........eeBBBBBBee........',
+                    '......LLBBBBBBBBBBLD......',
+                    '......LBBBBBBBBBBBBD......',
+                    '......LBBBBBBBBBBBBD......',
+                    '......LBBBBBBBBBBBBD......',
+                    '......LBDDDDDDDDDDBD......',
+                    '......LBDDDDDDDDDDBD......',
+                    '......LBLLLLLLLLLLBD......',
+                    '......LBLLLLLLLLLLBD......',
+                    '......LBBBBBBBBBBBBD......',
+                    '......DDDDBBDDBBDDDD......',
+                    '....LD....LD..LD....LD....',
+                    '....DD....LD..LD....DD....',
+                    '..LD......LD..LD......LD..',
+                    '..DD......DD..DD......DD..'
                 ],
-                palette: { 'B': '#3fd8ff', 'L': '#bff0ff', 'D': '#1c7fb0', 'e': '#ffffff', '.': null },
+                palette: { 'B': '#7cff6b', 'L': '#ccffc0', 'D': '#3a8a30', 'e': '#ffe14a', 'p': '#7a5a10', '.': null },
+                bodyGlow: '#7cff6b', eyeGlow: '#ffe14a'
+            },
+            // 1 — гигантский кальмар (детальный, удвоенное разрешение)
+            {
+                frame: [
+                    '......LLLLLLLLLD......',
+                    '......LBBBBBBBBD......',
+                    '....LLBBBBBBBBBBLD....',
+                    '....LBBBBBBBBBBBBD....',
+                    '..LLBBBBBBBBBBBBBBLD..',
+                    '..LBBBBBBBBBBBBBBBBD..',
+                    '..LBBBpeBBBBBBpeBBBD..',
+                    '..LBBBeeBBBBBBeeBBBD..',
+                    '..LBBBBBBBBBBBBBBBBD..',
+                    '..DDDDBBDDBBDDBBDDDD..',
+                    '......LD..LD..LD......',
+                    '......DD..DD..DD......',
+                    '....LD..LD..LD..LD....',
+                    '....DD..DD..DD..DD....',
+                    '..LD..............LD..',
+                    '..DD..............DD..'
+                ],
+                palette: { 'B': '#3fd8ff', 'L': '#bff0ff', 'D': '#1c7fb0', 'e': '#eaffff', 'p': '#0f5a82', '.': null },
                 bodyGlow: '#3fd8ff', eyeGlow: '#eaffff'
             },
-            // 1 — гигантский краб
+            // 2 — гигантский краб (детальный, удвоенное разрешение)
             {
                 frame: [
-                    '.B...........B.',
-                    '.B....BBB....B.',
-                    '..BBBBBBBBBBB..',
-                    '.BBeBBBBBBBeBB.',
-                    'BBBBBBBBBBBBBBB',
-                    'BLBBBBBBBBBBBLB',
-                    'BBBBBBBBBBBBBBB',
-                    'B.BBBBBBBBBBB.B',
-                    'B.B.B.B.B.B.B.B',
-                    '.B.B.B.B.B.B.B.'
+                    '..LD..............LD..',
+                    '..DD..............DD..',
+                    '....LD..LD..LD..LD....',
+                    '....LD..LD..LD..LD....',
+                    '..LLBBLLBBLLBBLLBBLD..',
+                    '..LBBBBBBBBBBBBBBBBD..',
+                    'LLBBBBpeBBBBBBpeBBBBLD',
+                    'LBBBBBeeBBBBBBeeBBBBBD',
+                    'LBBBBBBBBBBBBBBBBBBBBD',
+                    'LBDDBBBBBBBBBBBBBBDDBD',
+                    'LD..LBBBBBBBBBBBBD..LD',
+                    'LD..LBDDDDDDDDDDBD..LD',
+                    'LD..LD..........LD..LD',
+                    'DD..DD..........DD..DD',
+                    '......LLLD..LLLD......',
+                    '......DDDD..DDDD......'
                 ],
-                palette: { 'B': '#ff5e3a', 'L': '#ffb890', 'D': '#a8341c', 'e': '#ffe14a', '.': null },
+                palette: { 'B': '#ff5e3a', 'L': '#ffb890', 'D': '#a8341c', 'e': '#ffe14a', 'p': '#7a2412', '.': null },
                 bodyGlow: '#ff5e3a', eyeGlow: '#ffe14a'
             },
-            // 2 — гигантский осьминог
+            // 3 — гигантский осьминог (детальный, удвоенное разрешение)
             {
                 frame: [
-                    '...A.......A...',
-                    '...A.......A...',
-                    '..LBBBBBBBBBL..',
-                    '.LBBBBBBBBBBBL.',
-                    'LBBeeBBBBBeeBBL',
-                    'LBBeeBBBBBeeBBL',
-                    'LBBBBBBBBBBBBBL',
-                    '.LBBBBBBBBBBBL.',
-                    '..BmBmBmBmBmB..',
-                    '..D.D.D.D.D.D..',
-                    '.D.D.D.D.D.D.D.'
+                    '....LLLLLLLLLLLLLD....',
+                    '....LBBBBBBBBBBBBD....',
+                    '..LLBBBBBBBBBBBBBBLD..',
+                    '..LBBBBBBBBBBBBBBBBD..',
+                    'LLBBBBBBBBBBBBBBBBBBLD',
+                    'LBBBBBBBBBBBBBBBBBBBBD',
+                    'LBBBpeBBBBBBBBBBpeBBBD',
+                    'LBBBeeBBBBBBBBBBeeBBBD',
+                    'LBBBBBBBBBBBBBBBBBBBBD',
+                    'LBBBBBBBBBBBBBBBBBBBBD',
+                    'LBBBBBBBBBBBBBBBBBBBBD',
+                    'DDBBDDBBDDBBDDBBDDBBDD',
+                    '..LD..LD..LD..LD..LD..',
+                    '..DD..LD..LD..LD..DD..',
+                    'LD....LD..LD..LD....LD',
+                    'DD....DD..DD..DD....DD'
                 ],
-                palette: { 'A': '#7a3b8f', 'B': '#c13ae0', 'L': '#e89bff', 'D': '#6a1f86', 'e': '#9dff5a', 'm': '#ffe14a', '.': null },
+                palette: { 'A': '#7a3b8f', 'B': '#c13ae0', 'L': '#e89bff', 'D': '#6a1f86', 'e': '#9dff5a', 'p': '#2c6618', 'm': '#ffe14a', '.': null },
                 bodyGlow: '#c13ae0', eyeGlow: '#9dff5a'
             },
-            // 3 — гигантский жук
+            // 4 — гигантский череп (детальный, удвоенное разрешение)
             {
                 frame: [
-                    '...D.......D...',
-                    '....D.....D....',
-                    '..LBBBBBBBBBL..',
-                    '.BBBBBBBBBBBBB.',
-                    'BBeBBBBBBBBBeBB',
-                    'BBBBBBBBBBBBBBB',
-                    'BBBDDDDDDDDDBBB',
-                    'BBBBBBBBBBBBBBB',
-                    '.BBBBBBBBBBBBB.',
-                    '.LB.B.B.B.B.BL.',
-                    'B.B.......B.B.B'
+                    '..LLLLLLLLLLLLLLLLLD..',
+                    '..LBBBBBBBBBBBBBBBBD..',
+                    'LLBBBBBBBBBBBBBBBBBBLD',
+                    'LBBBBBBBBBBBBBBBBBBBBD',
+                    'LBBBeeeeBBBBBBeeeeBBBD',
+                    'LBBBeppeBBBBBBeppeBBBD',
+                    'LBBBeeeeBBBBBBeeeeBBBD',
+                    'LBBBeeeeBBBBBBeeeeBBBD',
+                    'LBBBBBBBBBBBBBBBBBBBBD',
+                    'LBBBBBBBBBBBBBBBBBBBBD',
+                    'LBBBBBBBBBBBBBBBBBBBBD',
+                    'LBDDBBDDBBDDBBDDBBDDBD',
+                    'LD..LD..LD..LD..LD..LD',
+                    'DD..DD..DD..DD..DD..DD',
+                    '..LD..LD......LD..LD..',
+                    '..DD..DD......DD..DD..'
                 ],
-                palette: { 'B': '#7cff6b', 'L': '#ccffc0', 'D': '#3a8a30', 'e': '#ff3b6b', '.': null },
-                bodyGlow: '#7cff6b', eyeGlow: '#ff7c9c'
-            },
-            // 4 — гигантский череп
-            {
-                frame: [
-                    '..BBBBBBBBBBB..',
-                    '.BBBBBBBBBBBBB.',
-                    'BBBBBBBBBBBBBBB',
-                    'BBeeeBBBBBeeeBB',
-                    'BBeeeBBBBBeeeBB',
-                    'BBBBBBBBBBBBBBB',
-                    'BBBBBBBBBBBBBBB',
-                    '.BBBBBBBBBBBBB.',
-                    '..BmBmBmBmBmB..',
-                    '..BmBmBmBmBmB..',
-                    '...B.B.B.B.B...'
-                ],
-                palette: { 'B': '#cfd3e0', 'L': '#ffffff', 'D': '#7a7e90', 'e': '#ff3b3b', 'm': '#9aa0b0', '.': null },
+                palette: { 'B': '#cfd3e0', 'L': '#ffffff', 'D': '#7a7e90', 'e': '#ff3b3b', 'p': '#6a1010', 'm': '#9aa0b0', '.': null },
                 bodyGlow: '#cfd3e0', eyeGlow: '#ff5e5e'
             }
         ];
@@ -804,21 +837,27 @@
             powerups = [];
             floatTexts = [];
 
+            // Сложность считается ВНУТРИ цикла из 5 раундов: после каждого босса
+            // (нового цикла) она «сбрасывается» к началу, но каждый цикл чуть выше —
+            // поэтому спуск замедляется после босса, но в целом игра ускоряется.
+            const cycle = Math.floor((level - 1) / 5);    // 0,1,2,... (сколько боссов пройдено)
+            const inCycle = (level - 1) % 5;              // 0..4 — номер раунда в цикле
+            const diff = inCycle + cycle;                 // сбрасывается каждый цикл, +1 за цикл
+
             // Скорость задаётся так, чтобы строй пересекал свободное поле за фиксированное
             // время — тогда темп одинаков и в широком альбомном, и в узком портретном холсте.
-            // С уровнем поле пересекается быстрее.
             const margin = 10 * unit;
             const travelRoom = Math.max(40, canvas.width - formationW - 2 * margin);
-            const traverseSec = Math.max(0.7, 1.6 - (level - 1) * 0.18);
+            const traverseSec = Math.max(0.7, 1.6 - diff * 0.18);
             enemySpeed = travelRoom / (traverseSec * 60);   // px за кадр (при 60 fps), далее * dt
 
             // Шаг спуска привязан к расстоянию до игрока: фиксированное число «ступеней»,
             // поэтому время до игрока одинаково на коротком и высоком холсте.
             const formationBottom = startY + enemyRows * (enemyHeight + enemySpacing) - enemySpacing;
-            const desiredSteps = Math.max(10, 22 - (level - 1) * 2);
+            const desiredSteps = Math.max(10, 22 - diff * 2);
             enemyStep = Math.max(6, Math.round((player.y - formationBottom) / desiredSteps));
 
-            enemyShootInterval = Math.max(350, 1000 - (level - 1) * 90);
+            enemyShootInterval = Math.max(350, 1000 - diff * 90);
 
             // Сбрасываем флаги уровня
             isBoss = false;
