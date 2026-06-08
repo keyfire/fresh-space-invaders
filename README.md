@@ -2,7 +2,7 @@
 
 Аркадная игра в стиле Space Invaders на чистом HTML5 Canvas. Один самодостаточный файл — без сборки, зависимостей и внешних ассетов.
 
-🎮 Играть онлайн: <https://ckerp.ru/>
+🎮 Играть онлайн: <https://keyfire.github.io/fresh-space-invaders/>
 
 ## Управление
 
