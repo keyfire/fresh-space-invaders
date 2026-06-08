@@ -9,6 +9,9 @@ desktop.ini
 *.swp
 *~
 
+# Локальные конфиги Claude Code / превью
+.claude/
+
 # Logs / temp
 *.log
 tmp/
