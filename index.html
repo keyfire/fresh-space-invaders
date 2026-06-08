@@ -362,6 +362,14 @@
         ];
         const shipPalette = { 'H': '#c2c8e0', 'C': '#1b9dff', 'F': '#ff9d00', '.': null };
 
+        // Повреждения корабля по числу потерянных жизней (от старта в 3 жизни).
+        // Стадия 0 — после потери 1-й жизни, стадия 1 — после потери 2-й.
+        // Координаты клеток [c, r] на сетке спрайта 13×10 (только по корпусу/кабине).
+        const shipDamageStages = [
+            [ [9, 5], [10, 6], [3, 6] ],
+            [ [8, 6], [2, 6], [6, 4], [7, 7] ]
+        ];
+
         // Капсулы-призы: P корпус, X символ, '.' прозрачно. Свой цвет и иконка у каждого типа.
         const powerupDefs = {
             // тройной выстрел — три патрона
@@ -1040,6 +1048,54 @@
                 }
             }
             ctx.restore();
+
+            drawShipDamage(p, s);
+        }
+
+        // Повреждения корабля: чем меньше жизней, тем больше обугленных клеток.
+        // Урон считается от текущих жизней, поэтому +1 от сердечка его откатывает.
+        function drawShipDamage(p, s) {
+            const dmg = Math.max(0, Math.min(shipDamageStages.length, 3 - lives));
+            if (dmg <= 0) return;
+            ctx.save();
+            // Обугленные клетки
+            for (let i = 0; i < dmg; i++) {
+                for (const [c, r] of shipDamageStages[i]) {
+                    ctx.fillStyle = '#241a22';
+                    ctx.fillRect(s.ox + c * s.cell, s.oy + r * s.cell, s.cell + 0.5, s.cell + 0.5);
+                }
+            }
+            // Тлеющие угольки на свежих повреждениях (мигают)
+            if (Math.floor(performance.now() / 130) % 2 === 0) {
+                ctx.fillStyle = '#ff6a00';
+                ctx.shadowColor = '#ff6a00';
+                ctx.shadowBlur = 6;
+                const e = Math.max(1, s.cell * 0.4);
+                for (const [c, r] of shipDamageStages[dmg - 1]) {
+                    ctx.fillRect(s.ox + c * s.cell + s.cell * 0.3, s.oy + r * s.cell + s.cell * 0.3, e, e);
+                }
+            }
+            ctx.restore();
+
+            // Дым при тяжёлых повреждениях (последняя стадия)
+            if (dmg >= shipDamageStages.length) {
+                ctx.save();
+                const baseX = p.x + p.width * 0.5;
+                const baseY = p.y + p.height * 0.28;
+                const now = performance.now();
+                for (let k = 0; k < 3; k++) {
+                    const t = ((now / 750) + k * 0.37) % 1;
+                    const px = baseX + Math.sin(now / 320 + k * 2) * s.cell * 0.9;
+                    const py = baseY - t * p.height * 0.75;
+                    ctx.globalAlpha = (1 - t) * 0.22;
+                    ctx.fillStyle = '#9aa0b0';
+                    ctx.beginPath();
+                    ctx.arc(px, py, s.cell * (0.6 + t * 1.3), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+                ctx.globalAlpha = 1;
+            }
         }
 
         // Жук-враг — детальный пиксельный спрайт, цвет по ряду, без яркого свечения
