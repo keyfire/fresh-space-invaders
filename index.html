@@ -6,7 +6,7 @@
     <title>Космические жуки</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
     <style>
         html, body {
             height: 100%;
@@ -21,7 +21,7 @@
             padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
             box-sizing: border-box;
             background: radial-gradient(circle at 50% 0%, #16163a 0%, #05050f 70%);
-            font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+            font-family: 'Comfortaa', 'Segoe UI', system-ui, sans-serif;
             color: #e8e8ff;
             -webkit-user-select: none;
             user-select: none;
@@ -37,8 +37,8 @@
         h1 {
             margin: 0 0 8px;
             font-size: clamp(16px, 4.4vw, 26px);
-            font-weight: 800;
-            letter-spacing: 1px;
+            font-weight: 700;
+            letter-spacing: 2px;
             color: #7cf6ff;
             text-shadow: 0 0 12px #1b9dff, 0 0 24px #1b9dff;
         }
@@ -797,13 +797,13 @@
                 drawParticles();
                 const titleSize = Math.round(canvas.width * 0.06);
                 ctx.fillStyle = '#7cf6ff';
-                ctx.font = `bold ${titleSize}px 'JetBrains Mono', monospace`;
+                ctx.font = `bold ${titleSize}px 'Comfortaa', sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#1b9dff';
                 ctx.shadowBlur = 20;
                 ctx.fillText('КОСМИЧЕСКИЕ ЖУКИ', canvas.width / 2, canvas.height / 2 - titleSize);
                 ctx.shadowBlur = 0;
-                ctx.font = `${Math.round(titleSize * 0.5)}px 'JetBrains Mono', monospace`;
+                ctx.font = `${Math.round(titleSize * 0.5)}px 'Comfortaa', sans-serif`;
                 ctx.fillStyle = '#cfd3f5';
                 ctx.fillText('Нажмите «Начать игру»', canvas.width / 2, canvas.height / 2);
                 ctx.textAlign = 'left';
@@ -850,7 +850,7 @@
             if (tripleShotTimer > 0 && !gameOver) {
                 const fs = Math.max(11, Math.round(canvas.width * 0.026));
                 ctx.save();
-                ctx.font = `bold ${fs}px 'JetBrains Mono', monospace`;
+                ctx.font = `bold ${fs}px 'Comfortaa', sans-serif`;
                 ctx.textAlign = 'left';
                 ctx.fillStyle = '#ff5ed0';
                 ctx.shadowColor = '#ff5ed0';
@@ -866,14 +866,14 @@
                 ctx.fillStyle = 'rgba(5, 5, 15, 0.55)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#7cf6ff';
-                ctx.font = `bold ${pSize}px 'JetBrains Mono', monospace`;
+                ctx.font = `bold ${pSize}px 'Comfortaa', sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#1b9dff';
                 ctx.shadowBlur = 18;
                 ctx.fillText('ПАУЗА', canvas.width / 2, canvas.height / 2 - pSize * 0.3);
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = '#cfd3f5';
-                ctx.font = `${Math.round(pSize * 0.4)}px 'JetBrains Mono', monospace`;
+                ctx.font = `${Math.round(pSize * 0.4)}px 'Comfortaa', sans-serif`;
                 ctx.fillText('«Продолжить» или Esc', canvas.width / 2, canvas.height / 2 + pSize * 0.6);
                 ctx.textAlign = 'left';
             }
@@ -885,14 +885,14 @@
                 ctx.fillStyle = 'rgba(5, 5, 15, 0.6)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ff7c9c';
-                ctx.font = `bold ${bigSize}px 'JetBrains Mono', monospace`;
+                ctx.font = `bold ${bigSize}px 'Comfortaa', sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#ff2b5e';
                 ctx.shadowBlur = 18;
                 ctx.fillText('ИГРА ОКОНЧЕНА', canvas.width / 2, canvas.height / 2 - bigSize);
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = '#e8e8ff';
-                ctx.font = `${smallSize}px 'JetBrains Mono', monospace`;
+                ctx.font = `${smallSize}px 'Comfortaa', sans-serif`;
                 ctx.fillText(`Ваш счёт: ${score}`, canvas.width / 2, canvas.height / 2 + smallSize);
                 ctx.fillText('Нажмите «Начать игру» для перезапуска', canvas.width / 2, canvas.height / 2 + smallSize * 2.5);
                 ctx.textAlign = 'left';
