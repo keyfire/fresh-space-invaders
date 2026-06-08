@@ -20,6 +20,11 @@
             height: 100%;
             overflow: hidden;
         }
+        /* Фон на корневом элементе заполняет весь экран, включая зоны под
+           «чёлкой» и индикатором; иначе в standalone снизу белая полоса. */
+        html {
+            background: #05050f;
+        }
         body {
             margin: 0;
             background: radial-gradient(circle at 50% 0%, #16163a 0%, #05050f 70%);
