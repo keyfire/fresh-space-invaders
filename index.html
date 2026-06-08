@@ -68,6 +68,14 @@
             touch-action: none;
             display: block;
         }
+        /* На телефоне голубая рамка и свечение не нужны */
+        @media (pointer: coarse) {
+            canvas {
+                border: none;
+                border-radius: 0;
+                box-shadow: none;
+            }
+        }
 
         /* Единый «прозрачный» стиль для оверлей-контролов */
         .ctrl {
