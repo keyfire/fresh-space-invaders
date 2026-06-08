@@ -303,11 +303,19 @@
         let tripleShotTimer = 0;              // мс оставшегося действия тройного выстрела
         let shieldTimer = 0;                  // мс действия щита
         let freezeTimer = 0;                  // мс заморозки жуков
+        let rapidTimer = 0;                   // мс действия «очереди» (скорострельность)
         const POWERUP_DROP_CHANCE = 0.14;     // шанс выпадения приза с жука
         const TRIPLE_SHOT_DURATION = 3000;    // тройной выстрел, мс
         const SHIELD_DURATION = 5000;         // щит, мс
         const FREEZE_DURATION = 3000;         // заморозка жуков, мс
-        const POWERUP_TYPES = ['triple', 'shield', 'freeze'];
+        const RAPID_DURATION = 2000;          // очередь выстрелов, мс
+        const POWERUP_TYPES = ['triple', 'shield', 'freeze', 'rapid'];
+
+        // Удержание огня (мышь / тап «Огонь» / пробел) и темп автоматической стрельбы
+        let fireHeld = false;
+        let fireCooldown = 0;                 // мс до следующего выстрела при удержании
+        const HOLD_INTERVAL = 280;            // обычный темп при удержании, мс
+        const RAPID_INTERVAL = 85;            // темп при активной «очереди», мс
 
         // Всплывающие надписи (например, «+1 ЖИЗНЬ» при подборе сердечка)
         let floatTexts = [];
@@ -413,6 +421,20 @@
                     '.PPPPPPP.'
                 ],
                 palette: { 'P': '#7fc8ff', 'X': '#ffffff', '.': null }
+            },
+            // очередь — стрелка вверх (быстрая стрельба)
+            rapid: {
+                color: '#ff9d2e',
+                frame: [
+                    '.PPPPPPP.',
+                    'PPP.X.PPP',
+                    'PP.XXX.PP',
+                    'P.XXXXX.P',
+                    'P...X...P',
+                    'PP..X..PP',
+                    '.PPPPPPP.'
+                ],
+                palette: { 'P': '#ff9d2e', 'X': '#fff1c0', '.': null }
             },
             // доп. жизнь — сердечко (без капсулы); выпадает реже и только при <3 жизнях
             heart: {
@@ -706,6 +728,9 @@
             tripleShotTimer = 0;
             shieldTimer = 0;
             freezeTimer = 0;
+            rapidTimer = 0;
+            fireHeld = false;
+            fireCooldown = 0;
             paused = false;
             pauseButton.classList.remove('paused');
             updateScore();
@@ -768,6 +793,16 @@
             if (tripleShotTimer > 0) tripleShotTimer = Math.max(0, tripleShotTimer - deltaTime);
             if (shieldTimer > 0) shieldTimer = Math.max(0, shieldTimer - deltaTime);
             if (freezeTimer > 0) freezeTimer = Math.max(0, freezeTimer - deltaTime);
+            if (rapidTimer > 0) rapidTimer = Math.max(0, rapidTimer - deltaTime);
+
+            // Автострельба при удержании огня. С активной «очередью» темп выше.
+            if (fireHeld) {
+                fireCooldown -= deltaTime;
+                if (fireCooldown <= 0) {
+                    shootPlayerBullet();
+                    fireCooldown = rapidTimer > 0 ? RAPID_INTERVAL : HOLD_INTERVAL;
+                }
+            }
 
             // Обновление пуль игрока
             for (let i = bullets.length - 1; i >= 0; i--) {
@@ -818,6 +853,7 @@
                     pu.y + pu.height > player.y) {
                     if (pu.type === 'shield') shieldTimer = SHIELD_DURATION;
                     else if (pu.type === 'freeze') freezeTimer = FREEZE_DURATION;
+                    else if (pu.type === 'rapid') rapidTimer = RAPID_DURATION;
                     else if (pu.type === 'heart') {
                         lives++;
                         updateScore();
@@ -1250,6 +1286,7 @@
                 if (tripleShotTimer > 0) buffs.push({ label: '✦ ТРОЙНОЙ ВЫСТРЕЛ', t: tripleShotTimer, color: '#ff5ed0' });
                 if (shieldTimer > 0) buffs.push({ label: '◆ ЩИТ', t: shieldTimer, color: '#3fd8ff' });
                 if (freezeTimer > 0) buffs.push({ label: '❄ ЗАМОРОЗКА', t: freezeTimer, color: '#7fc8ff' });
+                if (rapidTimer > 0) buffs.push({ label: '⟫ ОЧЕРЕДЬ', t: rapidTimer, color: '#ff9d2e' });
                 if (buffs.length) {
                     const fs = Math.max(11, Math.round(canvas.width * 0.026));
                     // Кнопка паузы теперь справа — индикаторы у левого края
@@ -1335,7 +1372,7 @@
                     keys.right = true;
                     break;
                 case ' ':
-                    shootPlayerBullet();
+                    startFire();
                     e.preventDefault();
                     break;
                 case 'Escape':
@@ -1360,6 +1397,9 @@
                 case 'D':
                     keys.right = false;
                     break;
+                case ' ':
+                    stopFire();
+                    break;
             }
         });
 
@@ -1376,12 +1416,12 @@
             if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
         });
 
-        // Выстрел по клику (левая кнопка)
+        // Выстрел по зажатию левой кнопки (удержание — автоматическая стрельба)
         canvas.addEventListener('mousedown', function(e) {
-            if (e.button === 0) {
-                initAudio();
-                shootPlayerBullet();
-            }
+            if (e.button === 0) startFire();
+        });
+        window.addEventListener('mouseup', function(e) {
+            if (e.button === 0) stopFire();
         });
 
         // ===== Сенсорные контролы (телефон) =====
@@ -1418,16 +1458,18 @@
         movePad.addEventListener('touchend', endPad);
         movePad.addEventListener('touchcancel', endPad);
 
-        // Кнопка выстрела справа: тап стреляет, удержание — автоогонь
-        let fireTimer = null;
+        // Единое удержание огня для всех способов ввода (пробел / мышь / «Огонь»).
+        // Мгновенный первый выстрел, дальше — автострельба в update(): обычный
+        // темп, а при активной «очереди» — частый.
         function startFire() {
-            if (fireTimer !== null) return;
+            if (fireHeld) return;          // игнорируем авто-повтор клавиши и лишние касания
             initAudio();
+            fireHeld = true;
+            fireCooldown = rapidTimer > 0 ? RAPID_INTERVAL : HOLD_INTERVAL;
             shootPlayerBullet();
-            fireTimer = setInterval(shootPlayerBullet, 280);
         }
         function stopFire() {
-            if (fireTimer !== null) { clearInterval(fireTimer); fireTimer = null; }
+            fireHeld = false;
         }
         fireButton.addEventListener('touchstart', function(e) { startFire(); e.preventDefault(); }, { passive: false });
         fireButton.addEventListener('touchend', function(e) { stopFire(); e.preventDefault(); }, { passive: false });
