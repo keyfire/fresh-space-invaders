@@ -321,6 +321,18 @@
         const RAPID_DURATION = 2000;          // очередь выстрелов, мс
         const DOUBLE_SHOT_DURATION = 5000;    // двойной выстрел, мс
         const POWERUP_TYPES = ['triple', 'shield', 'freeze', 'rapid', 'double'];
+        // Веса выпадения: тройной и двойной — вдвое реже остальных
+        const POWERUP_WEIGHTS = { triple: 1, double: 1, shield: 2, freeze: 2, rapid: 2 };
+        function pickPowerupType() {
+            let total = 0;
+            for (const t of POWERUP_TYPES) total += POWERUP_WEIGHTS[t] || 1;
+            let r = Math.random() * total;
+            for (const t of POWERUP_TYPES) {
+                r -= POWERUP_WEIGHTS[t] || 1;
+                if (r < 0) return t;
+            }
+            return POWERUP_TYPES[0];
+        }
 
         // Удержание огня (мышь / тап «Огонь» / пробел) и темп автоматической стрельбы
         let fireHeld = false;
@@ -1343,7 +1355,7 @@
         // (forced), иначе берётся случайный из POWERUP_TYPES (без сердечка).
         function spawnPowerup(cx, cy, forced) {
             const size = Math.round(enemyWidth * 0.7);
-            const type = forced || POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
+            const type = forced || pickPowerupType();
             powerups.push({
                 x: cx - size / 2,
                 y: cy - size / 2,
