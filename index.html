@@ -40,8 +40,15 @@
             text-shadow: 0 0 8px rgba(124, 246, 255, 0.6);
         }
         .hud span { color: #7cffa1; }
-        .hud .lives { color: #ff7c9c; }
+        .hud .lives { color: #ff7c9c; display: inline-block; }
         .hud .level { color: #ffd166; }
+        /* Вспышка счётчика жизней при подборе сердечка */
+        .hud .lives.flash { animation: lifeFlash 0.7s ease; }
+        @keyframes lifeFlash {
+            0%   { transform: scale(1);   color: #ff7c9c; text-shadow: 0 0 8px rgba(255,124,156,0.6); }
+            30%  { transform: scale(1.6); color: #ff4d6d; text-shadow: 0 0 16px rgba(255,77,109,0.95); }
+            100% { transform: scale(1);   color: #ff7c9c; text-shadow: 0 0 8px rgba(255,124,156,0.6); }
+        }
         .hud .sep { color: #5a6090; margin: 0 4px; }
         /* Игровое поле — занимает всё оставшееся место */
         .stage {
@@ -271,6 +278,9 @@
         const SHIELD_DURATION = 5000;         // щит, мс
         const FREEZE_DURATION = 3000;         // заморозка жуков, мс
         const POWERUP_TYPES = ['triple', 'shield', 'freeze'];
+
+        // Всплывающие надписи (например, «+1 ЖИЗНЬ» при подборе сердечка)
+        let floatTexts = [];
 
         // Цвета жуков по рядам
         const bugColors = ['#ff5e7e', '#ff9f45', '#ffe14a', '#7cff6b', '#6bd5ff'];
@@ -560,6 +570,35 @@
             }
         }
 
+        // ===== Всплывающие надписи =====
+        function spawnFloatText(x, y, text, color) {
+            floatTexts.push({ x: x, y: y, text: text, color: color, life: 1 });
+        }
+        function updateFloatTexts(dt) {
+            for (let i = floatTexts.length - 1; i >= 0; i--) {
+                const f = floatTexts[i];
+                f.y -= 0.7 * unit * dt;     // плывёт вверх
+                f.life -= 0.012 * dt;       // и затухает
+                if (f.life <= 0) floatTexts.splice(i, 1);
+            }
+        }
+        function drawFloatTexts() {
+            const fs = Math.max(14, Math.round(canvas.width * 0.034));
+            ctx.save();
+            ctx.font = `bold ${fs}px 'Comfortaa', sans-serif`;
+            ctx.textAlign = 'center';
+            for (const f of floatTexts) {
+                ctx.globalAlpha = Math.max(0, Math.min(1, f.life));
+                ctx.fillStyle = f.color;
+                ctx.shadowColor = f.color;
+                ctx.shadowBlur = 12;
+                ctx.fillText(f.text, f.x, f.y);
+            }
+            ctx.restore();
+            ctx.globalAlpha = 1;
+            ctx.textAlign = 'left';
+        }
+
         // Создание уровня (игрок + строй врагов). Счёт и жизни НЕ сбрасываются.
         function spawnLevel() {
             // Создаем игрока
@@ -594,6 +633,7 @@
             enemyBullets = [];
             particles = [];
             powerups = [];
+            floatTexts = [];
 
             // Скорость задаётся так, чтобы строй пересекал свободное поле за фиксированное
             // время — тогда темп одинаков и в широком альбомном, и в узком портретном холсте.
@@ -648,6 +688,13 @@
             levelElement.textContent = level;
         }
 
+        // Кратко подсветить счётчик жизней (при подборе сердечка)
+        function flashLives() {
+            livesElement.classList.remove('flash');
+            void livesElement.offsetWidth;   // перезапуск анимации
+            livesElement.classList.add('flash');
+        }
+
         // Единый цикл: звёзды и частицы живут всегда, логика — только в игре
         function loop(currentTime) {
             const deltaTime = currentTime - lastTime;
@@ -658,6 +705,7 @@
 
             updateStars(dt);
             updateParticles(dt);
+            updateFloatTexts(dt);
 
             if (gameRunning && !gameOver && !paused) {
                 update(deltaTime, dt);
@@ -731,7 +779,12 @@
                     pu.y + pu.height > player.y) {
                     if (pu.type === 'shield') shieldTimer = SHIELD_DURATION;
                     else if (pu.type === 'freeze') freezeTimer = FREEZE_DURATION;
-                    else if (pu.type === 'heart') { lives++; updateScore(); }
+                    else if (pu.type === 'heart') {
+                        lives++;
+                        updateScore();
+                        spawnFloatText(player.x + player.width / 2, player.y - player.height * 0.4, '+1 ЖИЗНЬ', '#ff6b86');
+                        flashLives();
+                    }
                     else tripleShotTimer = TRIPLE_SHOT_DURATION;
                     spawnExplosion(player.x + player.width / 2, player.y, powerupDefs[pu.type].color);
                     sndPowerup();
@@ -1100,6 +1153,9 @@
 
             // Частицы взрывов
             drawParticles();
+
+            // Всплывающие надписи («+1 ЖИЗНЬ» и т.п.)
+            drawFloatTexts();
 
             // Индикаторы активных бонусов (стопкой сверху, правее кнопки паузы)
             if (!gameOver) {
