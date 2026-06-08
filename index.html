@@ -85,7 +85,7 @@
         .pause-btn {
             display: none;
             top: 10px;
-            left: 10px;
+            right: 10px;
             width: 44px;
             height: 44px;
             border-radius: 50%;
@@ -210,9 +210,21 @@
         const fireButton = document.getElementById('fireButton');
         const stageElement = document.querySelector('.stage');
 
+        // Сенсорное устройство — показываем тач-контролы и приподнимаем корабль над ними
+        const isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
+
         // Переключение состояния интерфейса: menu | playing | over
         function setUIState(state) {
             document.body.className = 'state-' + state;
+        }
+
+        // Отступ корабля от низа: на сенсорных экранах оставляем место под
+        // нижние контролы (трек движения и кнопку «Огонь»), чтобы он не прятался.
+        function shipBottomInset() {
+            const base = Math.round(canvas.height * 0.04);
+            if (!isTouch) return base;
+            const sclY = canvas.height / (parseFloat(canvas.style.height) || canvas.height);
+            return base + Math.round(96 * sclY);   // ~96px CSS под контролы + safe-area
         }
 
         // Игровые параметры — пересчитываются под размер холста (см. computeLayout)
@@ -353,6 +365,20 @@
                     '.PPPPPPP.'
                 ],
                 palette: { 'P': '#7fc8ff', 'X': '#ffffff', '.': null }
+            },
+            // доп. жизнь — сердечко (без капсулы); выпадает реже и только при <3 жизнях
+            heart: {
+                color: '#ff4d6d',
+                frame: [
+                    '.XX...XX.',
+                    'XLXX.XXXX',
+                    'XLXXXXXXX',
+                    'XXXXXXXXX',
+                    '.XXXXXXX.',
+                    '..XXXXX..',
+                    '...XXX...'
+                ],
+                palette: { 'X': '#ff4d6d', 'L': '#ffd0db', '.': null }
             }
         };
 
@@ -452,7 +478,7 @@
                 player.x *= sx;
                 player.width = playerWidth;
                 player.height = playerHeight;
-                player.y = canvas.height - playerHeight - Math.round(canvas.height * 0.04);
+                player.y = canvas.height - playerHeight - shipBottomInset();
                 player.speed = 5 * unit;
                 player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
             }
@@ -539,7 +565,7 @@
             // Создаем игрока
             player = {
                 x: canvas.width / 2 - playerWidth / 2,
-                y: canvas.height - playerHeight - Math.round(canvas.height * 0.04),
+                y: canvas.height - playerHeight - shipBottomInset(),
                 width: playerWidth,
                 height: playerHeight,
                 speed: 5 * unit
@@ -679,7 +705,12 @@
                         const cx = enemies[j].x + enemies[j].width / 2;
                         const cy = enemies[j].y + enemies[j].height / 2;
                         spawnExplosion(cx, cy, bugColors[enemies[j].row % bugColors.length]);
-                        if (Math.random() < POWERUP_DROP_CHANCE) spawnPowerup(cx, cy);
+                        // Сердечко — втрое реже и только если жизней меньше 3; иначе обычный приз
+                        if (lives < 3 && Math.random() < POWERUP_DROP_CHANCE / 3) {
+                            spawnPowerup(cx, cy, 'heart');
+                        } else if (Math.random() < POWERUP_DROP_CHANCE) {
+                            spawnPowerup(cx, cy);
+                        }
                         sndExplosion();
                         bullets.splice(i, 1);
                         score += 10;
@@ -700,6 +731,7 @@
                     pu.y + pu.height > player.y) {
                     if (pu.type === 'shield') shieldTimer = SHIELD_DURATION;
                     else if (pu.type === 'freeze') freezeTimer = FREEZE_DURATION;
+                    else if (pu.type === 'heart') { lives++; updateScore(); }
                     else tripleShotTimer = TRIPLE_SHOT_DURATION;
                     spawnExplosion(player.x + player.width / 2, player.y, powerupDefs[pu.type].color);
                     sndPowerup();
@@ -824,10 +856,11 @@
             }
         }
 
-        // Создание падающего приза случайного типа в точке (cx, cy) — центр убитого жука
-        function spawnPowerup(cx, cy) {
+        // Создание падающего приза в точке (cx, cy). Тип можно задать явно
+        // (forced), иначе берётся случайный из POWERUP_TYPES (без сердечка).
+        function spawnPowerup(cx, cy, forced) {
             const size = Math.round(enemyWidth * 0.7);
-            const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
+            const type = forced || POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
             powerups.push({
                 x: cx - size / 2,
                 y: cy - size / 2,
@@ -1076,9 +1109,6 @@
                 if (freezeTimer > 0) buffs.push({ label: '❄ ЗАМОРОЗКА', t: freezeTimer, color: '#7fc8ff' });
                 if (buffs.length) {
                     const fs = Math.max(11, Math.round(canvas.width * 0.026));
-                    // сдвигаем правее круглой кнопки паузы (она ~64px по CSS)
-                    const scl = canvas.width / (parseFloat(canvas.style.width) || canvas.width);
-                    const xStart = 64 * scl;
                     ctx.save();
                     ctx.font = `bold ${fs}px 'Comfortaa', sans-serif`;
                     ctx.textAlign = 'left';
@@ -1086,7 +1116,7 @@
                     buffs.forEach((b, i) => {
                         ctx.fillStyle = b.color;
                         ctx.shadowColor = b.color;
-                        ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, fs * 1.7 + i * fs * 1.4);
+                        ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, fs * 0.6, fs * 1.6 + i * fs * 1.4);
                     });
                     ctx.restore();
                     ctx.textAlign = 'left';
