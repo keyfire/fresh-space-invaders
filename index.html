@@ -328,6 +328,45 @@
         // Всплывающие надписи (например, «+1 ЖИЗНЬ» при подборе сердечка)
         let floatTexts = [];
 
+        // ===== Рекорды (в куках) =====
+        let bestScore = 0;          // лучший счёт за всё время
+        let bestLevel = 0;          // лучший достигнутый уровень
+        let hadRecord = false;      // был ли рекорд на старте (для салюта)
+        let recordCelebrated = false; // салют уже показан в этой игре
+        let celebrateTimer = 0;     // мс показа «НОВЫЙ РЕКОРД!»
+        let fireworkTimer = 0;      // мс до следующего залпа салюта
+
+        function setCookie(name, value, days) {
+            const d = new Date();
+            d.setTime(d.getTime() + days * 86400000);
+            document.cookie = name + '=' + encodeURIComponent(value) +
+                ';expires=' + d.toUTCString() + ';path=/;SameSite=Lax';
+        }
+        function getCookie(name) {
+            const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+            return m ? decodeURIComponent(m[1]) : null;
+        }
+        function loadBest() {
+            bestScore = parseInt(getCookie('ksi_best_score'), 10) || 0;
+            bestLevel = parseInt(getCookie('ksi_best_level'), 10) || 0;
+            hadRecord = bestScore > 0 || bestLevel > 0;
+        }
+        function saveBest() {
+            setCookie('ksi_best_score', bestScore, 3650);
+            setCookie('ksi_best_level', bestLevel, 3650);
+        }
+        // Проверка/обновление рекорда; салют — при превышении уже существующего рекорда
+        function checkRecord() {
+            if (!recordCelebrated && hadRecord && (score > bestScore || level > bestLevel)) {
+                recordCelebrated = true;
+                startCelebration();
+            }
+            let grew = false;
+            if (score > bestScore) { bestScore = score; grew = true; }
+            if (level > bestLevel) { bestLevel = level; grew = true; }
+            if (grew) saveBest();
+        }
+
         // Цвета жуков по рядам
         const bugColors = ['#ff5e7e', '#ff9f45', '#ffe14a', '#7cff6b', '#6bd5ff'];
 
@@ -652,6 +691,42 @@
                 o.start(st); o.stop(st + 0.13);
             });
         }
+        function sndFanfare() {
+            if (!audioCtx) return;
+            const t = audioCtx.currentTime;
+            // триумфальное восходящее арпеджио
+            [523, 659, 784, 1047, 1319].forEach((f, i) => {
+                const o = audioCtx.createOscillator();
+                const g = audioCtx.createGain();
+                o.type = 'triangle';
+                const st = t + i * 0.1;
+                o.frequency.setValueAtTime(f, st);
+                g.gain.setValueAtTime(0.09, st);
+                g.gain.exponentialRampToValueAtTime(0.0001, st + 0.35);
+                o.connect(g); g.connect(audioCtx.destination);
+                o.start(st); o.stop(st + 0.35);
+            });
+        }
+
+        // ===== Салют «Новый рекорд» =====
+        function startCelebration() {
+            celebrateTimer = 3600;   // мс показа надписи и залпов
+            fireworkTimer = 0;       // первый залп сразу
+            sndFanfare();
+        }
+        function spawnFirework() {
+            const x = canvas.width * (0.15 + Math.random() * 0.7);
+            const y = canvas.height * (0.12 + Math.random() * 0.4);
+            const colors = ['#ff5e7e', '#ffd166', '#7cffa1', '#6bd5ff', '#c13ae0', '#ff9d2e', '#ffffff'];
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            const n = 30;
+            for (let i = 0; i < n; i++) {
+                const a = (Math.PI * 2) * i / n + Math.random() * 0.12;
+                const sp = Math.random() * 3.5 + 2;
+                particles.push({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 1, color: color });
+            }
+            sndExplosion();
+        }
 
         // ===== Адаптация под размер экрана (в т.ч. портрет iPhone) =====
         // Пересчёт игровых размеров от текущего холста
@@ -924,6 +999,10 @@
             isBoss = false;
             boss = null;
             paused = false;
+            // Новая игра — салют можно показать снова; рекорд берём актуальный
+            recordCelebrated = false;
+            celebrateTimer = 0;
+            hadRecord = bestScore > 0 || bestLevel > 0;
             pauseButton.classList.remove('paused');
             updateScore();
             spawnLevel();
@@ -950,6 +1029,7 @@
             scoreElement.textContent = score;
             livesElement.textContent = lives;
             levelElement.textContent = level;
+            checkRecord();
         }
 
         // Кратко подсветить счётчик жизней (при подборе сердечка)
@@ -970,6 +1050,16 @@
             updateStars(dt);
             updateParticles(dt);
             updateFloatTexts(dt);
+
+            // Салют «Новый рекорд» живёт поверх любого состояния
+            if (celebrateTimer > 0) {
+                celebrateTimer = Math.max(0, celebrateTimer - deltaTime);
+                fireworkTimer -= deltaTime;
+                if (fireworkTimer <= 0 && celebrateTimer > 400) {
+                    spawnFirework();
+                    fireworkTimer = 300;
+                }
+            }
 
             if (gameRunning && !gameOver && !paused) {
                 update(deltaTime, dt);
@@ -1523,6 +1613,11 @@
                 ctx.shadowBlur = 20;
                 ctx.fillText('КОСМИЧЕСКИЕ ЖУКИ', canvas.width / 2, canvas.height / 2 - titleSize * 1.8);
                 ctx.shadowBlur = 0;
+                if (hadRecord) {
+                    ctx.fillStyle = '#ffd166';
+                    ctx.font = `${Math.round(titleSize * 0.42)}px 'Comfortaa', sans-serif`;
+                    ctx.fillText(`Рекорд: ${bestScore} · уровень ${bestLevel}`, canvas.width / 2, canvas.height / 2 - titleSize * 0.7);
+                }
                 ctx.textAlign = 'left';
                 return;
             }
@@ -1664,6 +1759,26 @@
                 ctx.fillStyle = '#e8e8ff';
                 ctx.font = `${smallSize}px 'Comfortaa', sans-serif`;
                 ctx.fillText(`Ваш счёт: ${score}`, canvas.width / 2, canvas.height / 2 - bigSize * 0.6);
+                ctx.fillStyle = '#ffd166';
+                ctx.font = `${Math.round(smallSize * 0.82)}px 'Comfortaa', sans-serif`;
+                ctx.fillText(`Рекорд: ${bestScore} · уровень ${bestLevel}`, canvas.width / 2, canvas.height / 2 - bigSize * 0.6 + smallSize * 1.4);
+                ctx.textAlign = 'left';
+            }
+
+            // Большая надпись «НОВЫЙ РЕКОРД!» поверх всего во время салюта
+            if (celebrateTimer > 0) {
+                const tt = performance.now();
+                const size = Math.round(canvas.width * 0.085 * (1 + Math.sin(tt / 150) * 0.06));
+                ctx.save();
+                ctx.font = `bold ${size}px 'Comfortaa', sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.globalAlpha = Math.min(1, celebrateTimer / 400);
+                ctx.fillStyle = '#ffd166';
+                ctx.shadowColor = '#ff7c9c';
+                ctx.shadowBlur = 26;
+                ctx.fillText('НОВЫЙ РЕКОРД!', canvas.width / 2, canvas.height * 0.3);
+                ctx.restore();
+                ctx.globalAlpha = 1;
                 ctx.textAlign = 'left';
             }
         }
@@ -1825,6 +1940,7 @@
         window.addEventListener('orientationchange', function() { setTimeout(fitCanvas, 200); });
 
         // Запуск единого цикла анимации
+        loadBest();
         setUIState('menu');
         fitCanvas();
         lastTime = performance.now();
