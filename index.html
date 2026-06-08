@@ -297,6 +297,7 @@
         // Босс: после каждого 5-го раунда. HP = числу пришельцев в строю.
         let isBoss = false;
         let boss = null;
+        let bossVictoryTimer = 0;   // мс показа «БОСС ПОВЕРЖЕН!» перед продолжением
         // Текущая форма пришельцев — меняется каждые 5 раундов циклично
         function currentFormIndex() {
             return Math.floor((level - 1) / 5) % bugForms.length;
@@ -312,12 +313,14 @@
         let shieldTimer = 0;                  // мс действия щита
         let freezeTimer = 0;                  // мс заморозки жуков
         let rapidTimer = 0;                   // мс действия «очереди» (скорострельность)
+        let doubleShotTimer = 0;              // мс действия двойного выстрела
         const POWERUP_DROP_CHANCE = 0.14;     // шанс выпадения приза с жука
         const TRIPLE_SHOT_DURATION = 3000;    // тройной выстрел, мс
         const SHIELD_DURATION = 5000;         // щит, мс
         const FREEZE_DURATION = 3000;         // заморозка жуков, мс
         const RAPID_DURATION = 2000;          // очередь выстрелов, мс
-        const POWERUP_TYPES = ['triple', 'shield', 'freeze', 'rapid'];
+        const DOUBLE_SHOT_DURATION = 5000;    // двойной выстрел, мс
+        const POWERUP_TYPES = ['triple', 'shield', 'freeze', 'rapid', 'double'];
 
         // Удержание огня (мышь / тап «Огонь» / пробел) и темп автоматической стрельбы
         let fireHeld = false;
@@ -381,8 +384,8 @@
             ],
             // 1 — кальмар
             [
-                ['...XXXXX...', '..XXXXXXX..', '.XXXXXXXXX.', '.XXeXXXeXX.', '.XXXXXXXXX.', '...X.X.X...', '..X.X.X.X..', '.X.......X.'],
-                ['...XXXXX...', '..XXXXXXX..', '.XXXXXXXXX.', '.XXeXXXeXX.', '.XXXXXXXXX.', '...X.X.X...', '.X.X.X.X.X.', '..X.....X..']
+                ['...XXXXX...', '..XXXXXXX..', '..XeXXXeX..', '..XXXXXXX..', '...XXXXX...', '...X.X.X...', '..X.X.X.X..', '.X.......X.'],
+                ['...XXXXX...', '..XXXXXXX..', '..XeXXXeX..', '..XXXXXXX..', '...XXXXX...', '...X.X.X...', '.X.X.X.X.X.', '..X.....X..']
             ],
             // 2 — краб
             [
@@ -396,8 +399,8 @@
             ],
             // 4 — череп
             [
-                ['.XXXXXXXXX.', 'XXXXXXXXXXX', 'XXeeXXXeeXX', 'XXeeXXXeeXX', 'XXXXXXXXXXX', 'XXXXXXXXXXX', 'X.X.X.X.X.X', '.X.X...X.X.'],
-                ['.XXXXXXXXX.', 'XXXXXXXXXXX', 'XXeeXXXeeXX', 'XXeeXXXeeXX', 'XXXXXXXXXXX', 'XXXXXXXXXXX', '.X.X.X.X.X.', 'X.X.....X.X']
+                ['...XXXXX...', '..XXXXXXX..', '.XXXXXXXXX.', '.XeeXXXeeX.', '.XXXXXXXXX.', '..XXXXXXX..', '..X.X.X.X..', '...X.X.X...'],
+                ['...XXXXX...', '..XXXXXXX..', '.XXXXXXXXX.', '.XeeXXXeeX.', '.XXXXXXXXX.', '..XXXXXXX..', '.X.X.X.X.X.', '..X.X.X.X..']
             ]
         ];
 
@@ -440,12 +443,12 @@
                     '......LBBBBBBBBD......',
                     '....LLBBBBBBBBBBLD....',
                     '....LBBBBBBBBBBBBD....',
-                    '..LLBBBBBBBBBBBBBBLD..',
-                    '..LBBBBBBBBBBBBBBBBD..',
-                    '..LBBBpeBBBBBBpeBBBD..',
-                    '..LBBBeeBBBBBBeeBBBD..',
-                    '..LBBBBBBBBBBBBBBBBD..',
-                    '..DDDDBBDDBBDDBBDDDD..',
+                    '....LBpeBBBBBBpeBD....',
+                    '....LBeeBBBBBBeeBD....',
+                    '....LBBBBBBBBBBBBD....',
+                    '....DDBBBBBBBBBBDD....',
+                    '......LBBBBBBBBD......',
+                    '......LBDDBBDDBD......',
                     '......LD..LD..LD......',
                     '......DD..DD..DD......',
                     '....LD..LD..LD..LD....',
@@ -505,22 +508,22 @@
             // 4 — гигантский череп (детальный, удвоенное разрешение)
             {
                 frame: [
-                    '..LLLLLLLLLLLLLLLLLD..',
+                    '......LLLLLLLLLD......',
+                    '......LBBBBBBBBD......',
+                    '....LLBBBBBBBBBBLD....',
+                    '....LBBBBBBBBBBBBD....',
+                    '..LLBBBBBBBBBBBBBBLD..',
                     '..LBBBBBBBBBBBBBBBBD..',
-                    'LLBBBBBBBBBBBBBBBBBBLD',
-                    'LBBBBBBBBBBBBBBBBBBBBD',
-                    'LBBBeeeeBBBBBBeeeeBBBD',
-                    'LBBBeppeBBBBBBeppeBBBD',
-                    'LBBBeeeeBBBBBBeeeeBBBD',
-                    'LBBBeeeeBBBBBBeeeeBBBD',
-                    'LBBBBBBBBBBBBBBBBBBBBD',
-                    'LBBBBBBBBBBBBBBBBBBBBD',
-                    'LBBBBBBBBBBBBBBBBBBBBD',
-                    'LBDDBBDDBBDDBBDDBBDDBD',
-                    'LD..LD..LD..LD..LD..LD',
-                    'DD..DD..DD..DD..DD..DD',
-                    '..LD..LD......LD..LD..',
-                    '..DD..DD......DD..DD..'
+                    '..LBeppeBBBBBBeppeBD..',
+                    '..LBeeeeBBBBBBeeeeBD..',
+                    '..LBBBBBBBBBBBBBBBBD..',
+                    '..DDBBBBBBBBBBBBBBDD..',
+                    '....LBBBBBBBBBBBBD....',
+                    '....LBDDBBDDBBDDBD....',
+                    '....LD..LD..LD..LD....',
+                    '....DD..DD..DD..DD....',
+                    '......LD..LD..LD......',
+                    '......DD..DD..DD......'
                 ],
                 palette: { 'B': '#cfd3e0', 'L': '#ffffff', 'D': '#7a7e90', 'e': '#ff3b3b', 'p': '#6a1010', 'm': '#9aa0b0', '.': null },
                 bodyGlow: '#cfd3e0', eyeGlow: '#ff5e5e'
@@ -608,6 +611,20 @@
                     '.PPPPPPP.'
                 ],
                 palette: { 'P': '#ff9d2e', 'X': '#fff1c0', '.': null }
+            },
+            // двойной выстрел — две параллельные полосы
+            double: {
+                color: '#b6ff5e',
+                frame: [
+                    '.PPPPPPP.',
+                    'PP.....PP',
+                    'P.X...X.P',
+                    'P.X...X.P',
+                    'P.X...X.P',
+                    'PP.....PP',
+                    '.PPPPPPP.'
+                ],
+                palette: { 'P': '#b6ff5e', 'X': '#eaffc0', '.': null }
             },
             // доп. жизнь — сердечко (без капсулы); выпадает реже и только при <3 жизнях
             heart: {
@@ -770,7 +787,9 @@
                 boss.x *= sx; boss.y *= sy;
                 boss.width = Math.round(canvas.width * 0.3);
                 boss.height = Math.round(boss.width * (bf.length / bf[0].length));
-                boss.speed = (canvas.width * 0.25) / 60;
+                boss.vx = (boss.vx < 0 ? -1 : 1) * (canvas.width * 0.25) / 60;
+                if (boss.vy !== 0) boss.vy = (boss.vy < 0 ? -1 : 1) * (canvas.height * 0.16) / 60;
+                boss.yMin *= sy; boss.yMax *= sy;
             }
             initStars();
         }
@@ -965,14 +984,23 @@
             const bw = Math.round(canvas.width * 0.3);
             const bh = Math.round(bw * (def.frame.length / def.frame[0].length));
             const hp = enemyRows * enemyCols;   // HP = суммарному HP всех пришельцев
+            const bossNum = Math.max(1, Math.round(level / 5));  // 1,2,3,... номер босса
+            const spX = (canvas.width * 0.25) / 60;
+            const spY = (canvas.height * 0.16) / 60;
+            const yTop = Math.round(canvas.height * 0.06);
+            // со 2-го босса — диагональ (вертикальная скорость), с 3-го — больший
+            // вертикальный размах (залетает ниже)
+            const yBand = bossNum >= 3 ? 0.6 : (bossNum >= 2 ? 0.42 : 0.2);
             boss = {
                 form: form,
                 x: canvas.width / 2 - bw / 2,
-                y: Math.round(canvas.height * 0.08),
+                y: yTop,
                 width: bw,
                 height: bh,
-                dir: 1,
-                speed: (canvas.width * 0.25) / 60,   // px/кадр патрулирования
+                vx: spX * (Math.random() < 0.5 ? 1 : -1),
+                vy: bossNum >= 2 ? spY * (Math.random() < 0.5 ? 1 : -1) : 0,
+                yMin: yTop,
+                yMax: Math.round(canvas.height * yBand),
                 hp: hp,
                 maxHp: hp,
                 shootTimer: 0,
@@ -994,10 +1022,12 @@
             shieldTimer = 0;
             freezeTimer = 0;
             rapidTimer = 0;
+            doubleShotTimer = 0;
             fireHeld = false;
             fireCooldown = 0;
             isBoss = false;
             boss = null;
+            bossVictoryTimer = 0;
             paused = false;
             // Новая игра — салют можно показать снова; рекорд берём актуальный
             recordCelebrated = false;
@@ -1061,7 +1091,14 @@
                 }
             }
 
-            if (gameRunning && !gameOver && !paused) {
+            // Пауза после победы над боссом: показываем надпись, затем продолжаем
+            if (bossVictoryTimer > 0) {
+                bossVictoryTimer = Math.max(0, bossVictoryTimer - deltaTime);
+                if (bossVictoryTimer === 0) advanceStage();
+            }
+
+            // Игровая логика стоит на паузе во время «Босс повержен»
+            if (gameRunning && !gameOver && !paused && bossVictoryTimer <= 0) {
                 update(deltaTime, dt);
             }
 
@@ -1084,6 +1121,7 @@
             if (shieldTimer > 0) shieldTimer = Math.max(0, shieldTimer - deltaTime);
             if (freezeTimer > 0) freezeTimer = Math.max(0, freezeTimer - deltaTime);
             if (rapidTimer > 0) rapidTimer = Math.max(0, rapidTimer - deltaTime);
+            if (doubleShotTimer > 0) doubleShotTimer = Math.max(0, doubleShotTimer - deltaTime);
 
             // Автострельба при удержании огня. С активной «очередью» темп выше.
             if (fireHeld) {
@@ -1163,6 +1201,7 @@
                     if (pu.type === 'shield') shieldTimer = SHIELD_DURATION;
                     else if (pu.type === 'freeze') freezeTimer = FREEZE_DURATION;
                     else if (pu.type === 'rapid') rapidTimer = RAPID_DURATION;
+                    else if (pu.type === 'double') doubleShotTimer = DOUBLE_SHOT_DURATION;
                     else if (pu.type === 'heart') {
                         lives++;
                         updateScore();
@@ -1324,6 +1363,12 @@
                 bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: 0 });
                 bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: -2.6 * unit });
                 bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: 2.6 * unit });
+            } else if (doubleShotTimer > 0) {
+                // две параллельные пули на ширине корабля (без угла)
+                const lx = player.x + player.width * 0.2 - bulletWidth / 2;
+                const rx = player.x + player.width * 0.8 - bulletWidth / 2;
+                bullets.push({ x: lx, y: top, width: bulletWidth, height: bulletHeight, vx: 0 });
+                bullets.push({ x: rx, y: top, width: bulletWidth, height: bulletHeight, vx: 0 });
             } else {
                 bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: 0 });
             }
@@ -1349,12 +1394,21 @@
         function updateBoss(deltaTime, dt) {
             if (!boss) return;
             const margin = 10 * unit;
-            // Патрулирование по горизонтали с отскоком от стен
-            boss.x += boss.dir * boss.speed * dt;
-            if (boss.x <= margin) { boss.x = margin; boss.dir = 1; }
+            // Горизонталь — с отскоком от стен
+            boss.x += boss.vx * dt;
+            if (boss.x <= margin) { boss.x = margin; boss.vx = Math.abs(boss.vx); }
             if (boss.x + boss.width >= canvas.width - margin) {
                 boss.x = canvas.width - margin - boss.width;
-                boss.dir = -1;
+                boss.vx = -Math.abs(boss.vx);
+            }
+            // Вертикаль (со 2-го босса) — отскок в дозволенной полосе
+            if (boss.vy !== 0) {
+                boss.y += boss.vy * dt;
+                if (boss.y <= boss.yMin) { boss.y = boss.yMin; boss.vy = Math.abs(boss.vy); }
+                if (boss.y + boss.height >= boss.yMax) {
+                    boss.y = boss.yMax - boss.height;
+                    boss.vy = -Math.abs(boss.vy);
+                }
             }
             // Стрельба веером
             boss.shootTimer += deltaTime;
@@ -1379,9 +1433,11 @@
             }
             sndExplosion();
             score += 200;
-            spawnFloatText(boss.x + boss.width / 2, boss.y + boss.height / 2, 'БОСС ПОВЕРЖЕН!', def.eyeGlow);
             updateScore();
-            advanceStage();
+            boss = null;                 // босс уничтожен
+            enemyBullets = [];           // его пули убираем, чтобы не задели в паузе
+            bossVictoryTimer = 1800;     // показываем «БОСС ПОВЕРЖЕН!» и держим паузу
+            // продолжение игры (advanceStage) — по истечении таймера, см. loop()
         }
 
         // ===== Рисование объектов =====
@@ -1707,6 +1763,7 @@
                 if (shieldTimer > 0) buffs.push({ label: '◆ ЩИТ', t: shieldTimer, color: '#3fd8ff' });
                 if (freezeTimer > 0) buffs.push({ label: '❄ ЗАМОРОЗКА', t: freezeTimer, color: '#7fc8ff' });
                 if (rapidTimer > 0) buffs.push({ label: '⟫ ОЧЕРЕДЬ', t: rapidTimer, color: '#ff9d2e' });
+                if (doubleShotTimer > 0) buffs.push({ label: '‖ ДВОЙНОЙ', t: doubleShotTimer, color: '#b6ff5e' });
                 if (buffs.length) {
                     const fs = Math.max(11, Math.round(canvas.width * 0.026));
                     // Кнопка паузы теперь справа — индикаторы у левого края
@@ -1777,6 +1834,22 @@
                 ctx.shadowColor = '#ff7c9c';
                 ctx.shadowBlur = 26;
                 ctx.fillText('НОВЫЙ РЕКОРД!', canvas.width / 2, canvas.height * 0.3);
+                ctx.restore();
+                ctx.globalAlpha = 1;
+                ctx.textAlign = 'left';
+            }
+
+            // Надпись «БОСС ПОВЕРЖЕН!» в паузе после победы над боссом
+            if (bossVictoryTimer > 0) {
+                const size = Math.round(canvas.width * 0.07);
+                ctx.save();
+                ctx.font = `bold ${size}px 'Comfortaa', sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.globalAlpha = Math.min(1, bossVictoryTimer / 350);
+                ctx.fillStyle = '#9dff5a';
+                ctx.shadowColor = '#3aff7a';
+                ctx.shadowBlur = 22;
+                ctx.fillText('БОСС ПОВЕРЖЕН!', canvas.width / 2, canvas.height / 2);
                 ctx.restore();
                 ctx.globalAlpha = 1;
                 ctx.textAlign = 'left';
