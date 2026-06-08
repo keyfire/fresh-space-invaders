@@ -361,21 +361,99 @@
             ]
         ];
 
-        // Босс — большой детальный пришелец (своя палитра, зелёные глаза, клыки).
-        const bossFrame = [
-            '...A.......A...',
-            '...A.......A...',
-            '..LBBBBBBBBBL..',
-            '.LBBBBBBBBBBBL.',
-            'LBBeeBBBBBeeBBL',
-            'LBBeeBBBBBeeBBL',
-            'LBBBBBBBBBBBBBL',
-            '.LBBBBBBBBBBBL.',
-            '..BmBmBmBmBmB..',
-            '..D.D.D.D.D.D..',
-            '.D.D.D.D.D.D.D.'
+        // Боссы — большие детальные версии каждой формы пришельцев. Выбираются
+        // по форме предыдущих 5 раундов, поэтому босс «в стиле» этих пришельцев.
+        const bossDefs = [
+            // 0 — гигантский кальмар (в тон синим пришельцам)
+            {
+                frame: [
+                    '......BBB......',
+                    '....BBBBBBB....',
+                    '...BBBBBBBBB...',
+                    '..BBBBBBBBBBB..',
+                    '..BBeeBBBeeBB..',
+                    '..BBeeBBBeeBB..',
+                    '..BBBBBBBBBBB..',
+                    '..LBBBBBBBBBL..',
+                    '...B.B.B.B.B...',
+                    '..B.B.B.B.B.B..',
+                    '.B...B.B.B...B.'
+                ],
+                palette: { 'B': '#3fd8ff', 'L': '#bff0ff', 'D': '#1c7fb0', 'e': '#ffffff', '.': null },
+                bodyGlow: '#3fd8ff', eyeGlow: '#eaffff'
+            },
+            // 1 — гигантский краб
+            {
+                frame: [
+                    '.B...........B.',
+                    '.B....BBB....B.',
+                    '..BBBBBBBBBBB..',
+                    '.BBeBBBBBBBeBB.',
+                    'BBBBBBBBBBBBBBB',
+                    'BLBBBBBBBBBBBLB',
+                    'BBBBBBBBBBBBBBB',
+                    'B.BBBBBBBBBBB.B',
+                    'B.B.B.B.B.B.B.B',
+                    '.B.B.B.B.B.B.B.'
+                ],
+                palette: { 'B': '#ff5e3a', 'L': '#ffb890', 'D': '#a8341c', 'e': '#ffe14a', '.': null },
+                bodyGlow: '#ff5e3a', eyeGlow: '#ffe14a'
+            },
+            // 2 — гигантский осьминог
+            {
+                frame: [
+                    '...A.......A...',
+                    '...A.......A...',
+                    '..LBBBBBBBBBL..',
+                    '.LBBBBBBBBBBBL.',
+                    'LBBeeBBBBBeeBBL',
+                    'LBBeeBBBBBeeBBL',
+                    'LBBBBBBBBBBBBBL',
+                    '.LBBBBBBBBBBBL.',
+                    '..BmBmBmBmBmB..',
+                    '..D.D.D.D.D.D..',
+                    '.D.D.D.D.D.D.D.'
+                ],
+                palette: { 'A': '#7a3b8f', 'B': '#c13ae0', 'L': '#e89bff', 'D': '#6a1f86', 'e': '#9dff5a', 'm': '#ffe14a', '.': null },
+                bodyGlow: '#c13ae0', eyeGlow: '#9dff5a'
+            },
+            // 3 — гигантский жук
+            {
+                frame: [
+                    '...D.......D...',
+                    '....D.....D....',
+                    '..LBBBBBBBBBL..',
+                    '.BBBBBBBBBBBBB.',
+                    'BBeBBBBBBBBBeBB',
+                    'BBBBBBBBBBBBBBB',
+                    'BBBDDDDDDDDDBBB',
+                    'BBBBBBBBBBBBBBB',
+                    '.BBBBBBBBBBBBB.',
+                    '.LB.B.B.B.B.BL.',
+                    'B.B.......B.B.B'
+                ],
+                palette: { 'B': '#7cff6b', 'L': '#ccffc0', 'D': '#3a8a30', 'e': '#ff3b6b', '.': null },
+                bodyGlow: '#7cff6b', eyeGlow: '#ff7c9c'
+            },
+            // 4 — гигантский череп
+            {
+                frame: [
+                    '..BBBBBBBBBBB..',
+                    '.BBBBBBBBBBBBB.',
+                    'BBBBBBBBBBBBBBB',
+                    'BBeeeBBBBBeeeBB',
+                    'BBeeeBBBBBeeeBB',
+                    'BBBBBBBBBBBBBBB',
+                    'BBBBBBBBBBBBBBB',
+                    '.BBBBBBBBBBBBB.',
+                    '..BmBmBmBmBmB..',
+                    '..BmBmBmBmBmB..',
+                    '...B.B.B.B.B...'
+                ],
+                palette: { 'B': '#cfd3e0', 'L': '#ffffff', 'D': '#7a7e90', 'e': '#ff3b3b', 'm': '#9aa0b0', '.': null },
+                bodyGlow: '#cfd3e0', eyeGlow: '#ff5e5e'
+            }
         ];
-        const bossPalette = { 'A': '#7a3b8f', 'B': '#c13ae0', 'L': '#e89bff', 'D': '#6a1f86', 'e': '#9dff5a', 'm': '#ffe14a', '.': null };
 
         // Пиксельный спрайт корабля (квадратный, в тон жукам).
         // H корпус, C кабина, F дюза, '.' прозрачно.
@@ -580,9 +658,10 @@
             for (const b of enemyBullets) { b.x *= sx; b.y *= sy; }
             for (const pu of powerups) { pu.x *= sx; pu.y *= sy; pu.width = Math.round(enemyWidth * 0.7); pu.height = pu.width; }
             if (boss) {
+                const bf = bossDefs[boss.form || 0].frame;
                 boss.x *= sx; boss.y *= sy;
                 boss.width = Math.round(canvas.width * 0.3);
-                boss.height = Math.round(boss.width * (bossFrame.length / bossFrame[0].length));
+                boss.height = Math.round(boss.width * (bf.length / bf[0].length));
                 boss.speed = (canvas.width * 0.25) / 60;
             }
             initStars();
@@ -767,10 +846,13 @@
             powerups = [];
             floatTexts = [];
 
+            const form = currentFormIndex();   // форма предыдущих 5 раундов
+            const def = bossDefs[form];
             const bw = Math.round(canvas.width * 0.3);
-            const bh = Math.round(bw * (bossFrame.length / bossFrame[0].length));
+            const bh = Math.round(bw * (def.frame.length / def.frame[0].length));
             const hp = enemyRows * enemyCols;   // HP = суммарному HP всех пришельцев
             boss = {
+                form: form,
                 x: canvas.width / 2 - bw / 2,
                 y: Math.round(canvas.height * 0.08),
                 width: bw,
@@ -1160,14 +1242,15 @@
             }
         }
         function defeatBoss() {
+            const def = bossDefs[boss.form || 0];
             // Фейерверк взрывов по корпусу
             for (let k = 0; k < 26; k++) {
                 spawnExplosion(boss.x + Math.random() * boss.width,
-                               boss.y + Math.random() * boss.height, '#e89bff');
+                               boss.y + Math.random() * boss.height, def.bodyGlow);
             }
             sndExplosion();
             score += 200;
-            spawnFloatText(boss.x + boss.width / 2, boss.y + boss.height / 2, 'БОСС ПОВЕРЖЕН!', '#9dff5a');
+            spawnFloatText(boss.x + boss.width / 2, boss.y + boss.height / 2, 'БОСС ПОВЕРЖЕН!', def.eyeGlow);
             updateScore();
             advanceStage();
         }
@@ -1294,19 +1377,21 @@
 
         // Босс — большой детальный спрайт с пульсирующими глазами и лёгким покачиванием
         function drawBoss(b) {
+            const def = bossDefs[b.form || 0];
+            const frame = def.frame;
             const bob = Math.sin(performance.now() / 500) * b.height * 0.02;
             // свечение тела
-            const s = drawSprite(bossFrame, bossPalette, b.x, b.y + bob, b.width, b.height,
-                                 { color: '#c13ae0', blur: 14 });
+            const s = drawSprite(frame, def.palette, b.x, b.y + bob, b.width, b.height,
+                                 { color: def.bodyGlow, blur: 14 });
             // пульсирующее свечение глаз
             const glow = 6 + Math.sin(performance.now() / 180) * 4;
             ctx.save();
-            ctx.shadowColor = '#9dff5a';
+            ctx.shadowColor = def.eyeGlow;
             ctx.shadowBlur = glow;
-            ctx.fillStyle = '#bfff8a';
-            for (let r = 0; r < bossFrame.length; r++) {
-                for (let c = 0; c < bossFrame[r].length; c++) {
-                    if (bossFrame[r][c] === 'e') {
+            ctx.fillStyle = def.eyeGlow;
+            for (let r = 0; r < frame.length; r++) {
+                for (let c = 0; c < frame[r].length; c++) {
+                    if (frame[r][c] === 'e') {
                         ctx.fillRect(s.ox + c * s.cell, s.oy + r * s.cell, s.cell + 0.5, s.cell + 0.5);
                     }
                 }
@@ -1334,10 +1419,11 @@
             ctx.strokeStyle = 'rgba(230, 240, 255, 0.5)';
             ctx.lineWidth = 1.5;
             ctx.strokeRect(bx, by, bw, bh);
-            ctx.fillStyle = '#e89bff';
+            const labelCol = bossDefs[boss.form || 0].bodyGlow;
+            ctx.fillStyle = labelCol;
             ctx.font = `bold ${Math.round(canvas.width * 0.026)}px 'Comfortaa', sans-serif`;
             ctx.textAlign = 'center';
-            ctx.shadowColor = '#c13ae0';
+            ctx.shadowColor = labelCol;
             ctx.shadowBlur = 8;
             ctx.fillText('БОСС  ' + boss.hp + ' / ' + boss.maxHp, canvas.width / 2, by + bh + Math.round(canvas.width * 0.032));
             ctx.restore();
