@@ -13,13 +13,7 @@
             overflow: hidden;
         }
         body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100dvh;
             margin: 0;
-            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-            box-sizing: border-box;
             background: radial-gradient(circle at 50% 0%, #16163a 0%, #05050f 70%);
             font-family: 'Comfortaa', 'Segoe UI', system-ui, sans-serif;
             color: #e8e8ff;
@@ -31,66 +25,177 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            text-align: center;
-            max-width: 100%;
+            width: 100%;
+            height: 100dvh;
+            box-sizing: border-box;
         }
-        h1 {
-            margin: 0 0 8px;
-            font-size: clamp(16px, 4.4vw, 26px);
-            font-weight: 700;
-            letter-spacing: 2px;
-            color: #7cf6ff;
-            text-shadow: 0 0 12px #1b9dff, 0 0 24px #1b9dff;
+        /* Счёт/жизни/уровень — наверху вместо заголовка, с отступом под «чёлку» */
+        .hud {
+            width: 100%;
+            box-sizing: border-box;
+            padding: calc(env(safe-area-inset-top) + 6px) 10px 6px;
+            text-align: center;
+            font-size: clamp(14px, 4vw, 22px);
+            font-weight: bold;
+            text-shadow: 0 0 8px rgba(124, 246, 255, 0.6);
+        }
+        .hud span { color: #7cffa1; }
+        .hud .lives { color: #ff7c9c; }
+        .hud .level { color: #ffd166; }
+        .hud .sep { color: #5a6090; margin: 0 4px; }
+        /* Игровое поле — занимает всё оставшееся место */
+        .stage {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         canvas {
             border: 2px solid #2bd1ff;
             border-radius: 8px;
             background-color: #05050f;
             box-shadow: 0 0 25px rgba(43, 209, 255, 0.45), inset 0 0 40px rgba(20, 20, 60, 0.6);
-            max-width: 100%;
             touch-action: none;
             display: block;
         }
-        .score {
-            margin-top: 10px;
-            font-size: clamp(15px, 4vw, 22px);
+
+        /* Единый «прозрачный» стиль для оверлей-контролов */
+        .ctrl {
+            position: absolute;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(220, 232, 255, 0.10);
+            border: 1.5px solid rgba(220, 232, 255, 0.30);
+            color: rgba(230, 240, 255, 0.75);
+            box-shadow: 0 0 12px rgba(120, 160, 220, 0.15);
+            -webkit-backdrop-filter: blur(2px);
+            backdrop-filter: blur(2px);
+            cursor: pointer;
+            padding: 0;
+            touch-action: none;
+        }
+        .ctrl:active { background: rgba(220, 232, 255, 0.20); }
+
+        /* Кнопка паузы — кружок слева сверху, виден только в игре */
+        .pause-btn {
+            display: none;
+            top: 10px;
+            left: 10px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            gap: 4px;
+        }
+        body.state-playing .pause-btn { display: flex; }
+        .pause-btn::before, .pause-btn::after {
+            content: '';
+            width: 5px;
+            height: 16px;
+            border-radius: 1.5px;
+            background: rgba(230, 240, 255, 0.8);
+        }
+        /* В паузе значок превращается в «play» (треугольник) */
+        .pause-btn.paused::before {
+            width: 0; height: 0;
+            border-radius: 0;
+            background: transparent;
+            border-left: 14px solid rgba(230, 240, 255, 0.8);
+            border-top: 9px solid transparent;
+            border-bottom: 9px solid transparent;
+        }
+        .pause-btn.paused::after { display: none; }
+
+        /* Мобильные контролы — низ экрана, только на сенсорных устройствах */
+        .touch-controls { display: none; }
+        @media (pointer: coarse) {
+            body.state-playing .touch-controls { display: block; }
+        }
+        .move-pad {
+            position: absolute;
+            z-index: 5;
+            left: 10px;
+            bottom: calc(env(safe-area-inset-bottom) + 12px);
+            width: 80%;
+            max-width: calc(100% - 115px);   /* оставляем место под кнопку «Огонь» */
+            height: 58px;
+            border-radius: 29px;
+            background: rgba(220, 232, 255, 0.08);
+            border: 1.5px solid rgba(220, 232, 255, 0.28);
+            -webkit-backdrop-filter: blur(2px);
+            backdrop-filter: blur(2px);
+            touch-action: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: rgba(230, 240, 255, 0.45);
+            font-size: 20px;
+            letter-spacing: 8px;
+        }
+        .fire-btn {
+            right: 14px;
+            bottom: calc(env(safe-area-inset-bottom) + 4px);
+            width: 74px;
+            height: 74px;
+            border-radius: 50%;
+            font-size: 13px;
+            letter-spacing: 1px;
             font-weight: bold;
-            text-shadow: 0 0 8px rgba(124, 246, 255, 0.6);
+            flex-direction: column;
         }
-        .score span { color: #7cffa1; }
-        .score .lives { color: #ff7c9c; }
-        .score .level { color: #ffd166; }
-        .controls {
-            margin-top: 8px;
-            font-size: clamp(11px, 3vw, 14px);
-            color: #9aa0c8;
-            max-width: 95vw;
+        .fire-btn::before {
+            content: '';
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: rgba(230, 240, 255, 0.75);
+            box-shadow: 0 0 8px rgba(230, 240, 255, 0.5);
+            margin-bottom: 3px;
         }
-        button {
-            margin-top: 10px;
-            padding: 10px 22px;
-            font-size: 16px;
+
+        /* Центральная кнопка старт/заново — в меню и после проигрыша */
+        .center-btn {
+            display: none;
+            position: absolute;
+            z-index: 6;
+            top: 56%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 14px 30px;
+            font-size: 17px;
             cursor: pointer;
             color: #05050f;
             font-weight: bold;
             letter-spacing: 1px;
+            font-family: inherit;
             background: linear-gradient(180deg, #7cf6ff, #2bd1ff);
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             box-shadow: 0 0 16px rgba(43, 209, 255, 0.6);
             transition: transform 0.08s ease, box-shadow 0.2s ease;
         }
-        button:hover { box-shadow: 0 0 26px rgba(43, 209, 255, 0.9); }
-        button:active { transform: translateY(1px); }
+        body.state-menu .center-btn,
+        body.state-over .center-btn { display: block; }
+        .center-btn:hover { box-shadow: 0 0 26px rgba(43, 209, 255, 0.9); }
+        .center-btn:active { transform: translate(-50%, -50%) translateY(1px); }
     </style>
 </head>
 <body>
     <div class="game-container">
-        <h1>КОСМИЧЕСКИЕ ЖУКИ</h1>
-        <canvas id="gameCanvas" width="800" height="600"></canvas>
-        <div class="score">Счёт: <span id="score">0</span> &nbsp;|&nbsp; Жизни: <span id="lives" class="lives">3</span> &nbsp;|&nbsp; Уровень: <span id="level" class="level">1</span></div>
-        <div class="controls">Клавиши: ← → и Пробел &nbsp;·&nbsp; Мышь: курсор и клик &nbsp;·&nbsp; Телефон: палец и тап &nbsp;·&nbsp; Пауза: кнопка или Esc</div>
-        <button id="startButton">Начать игру</button>
+        <div class="hud">Счёт: <span id="score">0</span><span class="sep">·</span>Жизни: <span id="lives" class="lives">3</span><span class="sep">·</span>Уровень: <span id="level" class="level">1</span></div>
+        <div class="stage">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            <button class="ctrl pause-btn" id="pauseButton" aria-label="Пауза"></button>
+            <div class="touch-controls">
+                <div class="move-pad" id="movePad">‹ ›</div>
+                <button class="ctrl fire-btn" id="fireButton" aria-label="Выстрел">ОГОНЬ</button>
+            </div>
+            <button class="center-btn" id="startButton">Начать игру</button>
+        </div>
     </div>
 
     <script>
@@ -100,6 +205,15 @@
         const livesElement = document.getElementById('lives');
         const levelElement = document.getElementById('level');
         const startButton = document.getElementById('startButton');
+        const pauseButton = document.getElementById('pauseButton');
+        const movePad = document.getElementById('movePad');
+        const fireButton = document.getElementById('fireButton');
+        const stageElement = document.querySelector('.stage');
+
+        // Переключение состояния интерфейса: menu | playing | over
+        function setUIState(state) {
+            document.body.className = 'state-' + state;
+        }
 
         // Игровые параметры — пересчитываются под размер холста (см. computeLayout)
         let playerWidth = 50;
@@ -349,14 +463,14 @@
             initStars();
         }
 
-        // Подгонка холста под доступное место (с учётом плотности пикселей)
+        // Подгонка холста под доступное место сцены (с учётом плотности пикселей)
         function fitCanvas() {
             const oldW = canvas.width, oldH = canvas.height;
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
-            const reserved = 170; // место под заголовок, счёт, подсказку и кнопку
-            const availW = Math.max(240, window.innerWidth - 12);
-            const availH = Math.max(320, window.innerHeight - reserved);
-            const portrait = window.innerHeight > window.innerWidth;
+            // Сцена флексом занимает всё под HUD — меряем её, а не окно целиком
+            const availW = Math.max(240, (stageElement.clientWidth || window.innerWidth) - 8);
+            const availH = Math.max(320, (stageElement.clientHeight || window.innerHeight) - 8);
+            const portrait = availH > availW;
             let cssW, cssH;
             if (portrait) {
                 cssW = availW;
@@ -487,8 +601,11 @@
             tripleShotTimer = 0;
             shieldTimer = 0;
             freezeTimer = 0;
+            paused = false;
+            pauseButton.classList.remove('paused');
             updateScore();
             spawnLevel();
+            setUIState('playing');
         }
 
         // Следующий уровень — ускорение, счёт и жизни сохраняются
@@ -874,11 +991,8 @@
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#1b9dff';
                 ctx.shadowBlur = 20;
-                ctx.fillText('КОСМИЧЕСКИЕ ЖУКИ', canvas.width / 2, canvas.height / 2 - titleSize);
+                ctx.fillText('КОСМИЧЕСКИЕ ЖУКИ', canvas.width / 2, canvas.height / 2 - titleSize * 1.8);
                 ctx.shadowBlur = 0;
-                ctx.font = `${Math.round(titleSize * 0.5)}px 'Comfortaa', sans-serif`;
-                ctx.fillStyle = '#cfd3f5';
-                ctx.fillText('Нажмите «Начать игру»', canvas.width / 2, canvas.height / 2);
                 ctx.textAlign = 'left';
                 return;
             }
@@ -886,20 +1000,30 @@
             // Игрок
             if (player.width) drawShip(player);
 
-            // Кольцо щита вокруг корабля
+            // Щит — пиксельный полукруг-«козырёк» над кораблём (в тон капсуле)
             if (shieldTimer > 0 && player.width) {
+                const cell = Math.max(2, Math.min(player.width / 13, player.height / 10));
                 const cx = player.x + player.width / 2;
-                const cy = player.y + player.height / 2;
-                const rad = Math.max(player.width, player.height) * 0.7 + Math.sin(performance.now() / 120) * 2;
+                const cyc = player.y + player.height * 0.55;
+                const R = player.width * 0.66;
+                const pulse = 0.6 + Math.sin(performance.now() / 140) * 0.25;
+                const steps = Math.max(10, Math.round(Math.PI * R / cell));
                 ctx.save();
-                ctx.strokeStyle = '#3fd8ff';
-                ctx.globalAlpha = 0.55 + Math.sin(performance.now() / 120) * 0.2;
-                ctx.lineWidth = 2;
                 ctx.shadowColor = '#3fd8ff';
-                ctx.shadowBlur = 12;
-                ctx.beginPath();
-                ctx.arc(cx, cy, rad, 0, Math.PI * 2);
-                ctx.stroke();
+                ctx.shadowBlur = 8;
+                const seen = new Set();
+                for (let s = 0; s <= steps; s++) {
+                    const a = Math.PI + Math.PI * (s / steps);   // верхняя дуга π..2π
+                    const bx = Math.round((cx + Math.cos(a) * R) / cell) * cell;
+                    const by = Math.round((cyc + Math.sin(a) * R) / cell) * cell;
+                    const key = bx + ',' + by;
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    const edge = Math.abs(s / steps - 0.5) * 2;  // 0 на гребне, 1 по краям
+                    ctx.globalAlpha = pulse * (1 - edge * 0.35);
+                    ctx.fillStyle = edge < 0.5 ? '#aef1ff' : '#3fd8ff';
+                    ctx.fillRect(bx, by, cell + 0.5, cell + 0.5);
+                }
                 ctx.restore();
             }
 
@@ -944,7 +1068,7 @@
             // Частицы взрывов
             drawParticles();
 
-            // Индикаторы активных бонусов (стопкой сверху слева)
+            // Индикаторы активных бонусов (стопкой сверху, правее кнопки паузы)
             if (!gameOver) {
                 const buffs = [];
                 if (tripleShotTimer > 0) buffs.push({ label: '✦ ТРОЙНОЙ ВЫСТРЕЛ', t: tripleShotTimer, color: '#ff5ed0' });
@@ -952,6 +1076,9 @@
                 if (freezeTimer > 0) buffs.push({ label: '❄ ЗАМОРОЗКА', t: freezeTimer, color: '#7fc8ff' });
                 if (buffs.length) {
                     const fs = Math.max(11, Math.round(canvas.width * 0.026));
+                    // сдвигаем правее круглой кнопки паузы (она ~64px по CSS)
+                    const scl = canvas.width / (parseFloat(canvas.style.width) || canvas.width);
+                    const xStart = 64 * scl;
                     ctx.save();
                     ctx.font = `bold ${fs}px 'Comfortaa', sans-serif`;
                     ctx.textAlign = 'left';
@@ -959,7 +1086,7 @@
                     buffs.forEach((b, i) => {
                         ctx.fillStyle = b.color;
                         ctx.shadowColor = b.color;
-                        ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, fs * 0.6, fs * 1.6 + i * fs * 1.4);
+                        ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, fs * 1.7 + i * fs * 1.4);
                     });
                     ctx.restore();
                     ctx.textAlign = 'left';
@@ -980,7 +1107,7 @@
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = '#cfd3f5';
                 ctx.font = `${Math.round(pSize * 0.4)}px 'Comfortaa', sans-serif`;
-                ctx.fillText('«Продолжить» или Esc', canvas.width / 2, canvas.height / 2 + pSize * 0.6);
+                ctx.fillText('▷ сверху или Esc', canvas.width / 2, canvas.height / 2 + pSize * 0.6);
                 ctx.textAlign = 'left';
             }
 
@@ -995,12 +1122,11 @@
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#ff2b5e';
                 ctx.shadowBlur = 18;
-                ctx.fillText('ИГРА ОКОНЧЕНА', canvas.width / 2, canvas.height / 2 - bigSize);
+                ctx.fillText('ИГРА ОКОНЧЕНА', canvas.width / 2, canvas.height / 2 - bigSize * 2.2);
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = '#e8e8ff';
                 ctx.font = `${smallSize}px 'Comfortaa', sans-serif`;
-                ctx.fillText(`Ваш счёт: ${score}`, canvas.width / 2, canvas.height / 2 + smallSize);
-                ctx.fillText('Нажмите «Начать игру» для перезапуска', canvas.width / 2, canvas.height / 2 + smallSize * 2.5);
+                ctx.fillText(`Ваш счёт: ${score}`, canvas.width / 2, canvas.height / 2 - bigSize * 0.6);
                 ctx.textAlign = 'left';
             }
         }
@@ -1008,7 +1134,10 @@
         // Конец игры
         function showGameOver() {
             gameRunning = false;
-            startButton.textContent = 'Начать игру';
+            paused = false;
+            stopFire();
+            startButton.textContent = 'Играть заново';
+            setUIState('over');
         }
 
         // Обработчик нажатия клавиш
@@ -1080,41 +1209,73 @@
             }
         });
 
-        // Сенсорное управление для мобильных
-        canvas.addEventListener('touchmove', function(e) {
-            if (!gameRunning || gameOver || paused || !player.width || e.touches.length === 0) return;
+        // ===== Сенсорные контролы (телефон) =====
+        // Трек-полоса слева: относительный свайп с ускорением — короткого
+        // движения хватает, чтобы пройти всё поле.
+        const MOVE_GAIN = 1.9;
+        let padTouchId = null, padLastX = 0;
+        movePad.addEventListener('touchstart', function(e) {
+            initAudio();
+            const t = e.changedTouches[0];
+            padTouchId = t.identifier;
+            padLastX = t.clientX;
+            e.preventDefault();
+        }, { passive: false });
+        movePad.addEventListener('touchmove', function(e) {
+            if (padTouchId === null || !player.width) return;
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
-            const touchX = (e.touches[0].clientX - rect.left) * scaleX;
-            player.x = touchX - player.width / 2;
-            if (player.x < 0) player.x = 0;
-            if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
-            e.preventDefault();
+            for (const t of e.changedTouches) {
+                if (t.identifier !== padTouchId) continue;
+                const dx = (t.clientX - padLastX) * scaleX * MOVE_GAIN;
+                padLastX = t.clientX;
+                player.x += dx;
+                if (player.x < 0) player.x = 0;
+                if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
+                e.preventDefault();
+            }
         }, { passive: false });
+        function endPad(e) {
+            for (const t of e.changedTouches) {
+                if (t.identifier === padTouchId) padTouchId = null;
+            }
+        }
+        movePad.addEventListener('touchend', endPad);
+        movePad.addEventListener('touchcancel', endPad);
 
-        canvas.addEventListener('touchstart', function(e) {
+        // Кнопка выстрела справа: тап стреляет, удержание — автоогонь
+        let fireTimer = null;
+        function startFire() {
+            if (fireTimer !== null) return;
             initAudio();
             shootPlayerBullet();
-            e.preventDefault();
-        }, { passive: false });
+            fireTimer = setInterval(shootPlayerBullet, 280);
+        }
+        function stopFire() {
+            if (fireTimer !== null) { clearInterval(fireTimer); fireTimer = null; }
+        }
+        fireButton.addEventListener('touchstart', function(e) { startFire(); e.preventDefault(); }, { passive: false });
+        fireButton.addEventListener('touchend', function(e) { stopFire(); e.preventDefault(); }, { passive: false });
+        fireButton.addEventListener('touchcancel', stopFire);
+        fireButton.addEventListener('mousedown', startFire);
+        fireButton.addEventListener('mouseup', stopFire);
+        fireButton.addEventListener('mouseleave', stopFire);
 
         // Пауза / продолжение
         function togglePause() {
             if (!gameRunning || gameOver) return;
             paused = !paused;
-            startButton.textContent = paused ? 'Продолжить' : 'Пауза';
+            pauseButton.classList.toggle('paused', paused);
+            if (paused) stopFire();
         }
 
-        // Обработчик кнопки: старт, либо пауза/продолжение во время игры
+        // Кнопка паузы (кружок слева сверху)
+        pauseButton.addEventListener('click', togglePause);
+
+        // Центральная кнопка — старт новой игры / рестарт
         startButton.addEventListener('click', function() {
             initAudio();
-            if (!gameRunning || gameOver) {
-                startGame();
-                paused = false;
-                startButton.textContent = 'Пауза';
-            } else {
-                togglePause();
-            }
+            startGame();
         });
 
         // Перестройка холста при изменении размера/повороте экрана
@@ -1122,6 +1283,7 @@
         window.addEventListener('orientationchange', function() { setTimeout(fitCanvas, 200); });
 
         // Запуск единого цикла анимации
+        setUIState('menu');
         fitCanvas();
         lastTime = performance.now();
         requestAnimationFrame(loop);
