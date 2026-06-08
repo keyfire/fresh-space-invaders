@@ -135,11 +135,16 @@
         let stars = [];
         let particles = [];
 
-        // Призы (падают с убитых жуков) и активный бонус
+        // Призы (падают с убитых жуков) и активные бонусы
         let powerups = [];
         let tripleShotTimer = 0;              // мс оставшегося действия тройного выстрела
-        const POWERUP_DROP_CHANCE = 0.12;     // шанс выпадения приза с жука
-        const TRIPLE_SHOT_DURATION = 5000;    // длительность тройного выстрела, мс
+        let shieldTimer = 0;                  // мс действия щита
+        let freezeTimer = 0;                  // мс заморозки жуков
+        const POWERUP_DROP_CHANCE = 0.14;     // шанс выпадения приза с жука
+        const TRIPLE_SHOT_DURATION = 3000;    // тройной выстрел, мс
+        const SHIELD_DURATION = 5000;         // щит, мс
+        const FREEZE_DURATION = 3000;         // заморозка жуков, мс
+        const POWERUP_TYPES = ['triple', 'shield', 'freeze'];
 
         // Цвета жуков по рядам
         const bugColors = ['#ff5e7e', '#ff9f45', '#ffe14a', '#7cff6b', '#6bd5ff'];
@@ -191,17 +196,51 @@
         ];
         const shipPalette = { 'H': '#c2c8e0', 'C': '#1b9dff', 'F': '#ff9d00', '.': null };
 
-        // Капсула-приз «тройной выстрел»: P корпус, X три патрона, '.' прозрачно
-        const powerupFrame = [
-            '.PPPPPPP.',
-            'PP.....PP',
-            'P.X.X.X.P',
-            'P.X.X.X.P',
-            'P.X.X.X.P',
-            'PP.....PP',
-            '.PPPPPPP.'
-        ];
-        const powerupPalette = { 'P': '#ff5ed0', 'X': '#fff59a', '.': null };
+        // Капсулы-призы: P корпус, X символ, '.' прозрачно. Свой цвет и иконка у каждого типа.
+        const powerupDefs = {
+            // тройной выстрел — три патрона
+            triple: {
+                color: '#ff5ed0',
+                frame: [
+                    '.PPPPPPP.',
+                    'PP.....PP',
+                    'P.X.X.X.P',
+                    'P.X.X.X.P',
+                    'P.X.X.X.P',
+                    'PP.....PP',
+                    '.PPPPPPP.'
+                ],
+                palette: { 'P': '#ff5ed0', 'X': '#fff59a', '.': null }
+            },
+            // щит — крест-герб
+            shield: {
+                color: '#3fd8ff',
+                frame: [
+                    '.PPPPPPP.',
+                    'PPXXXXXPP',
+                    'P.XXXXX.P',
+                    'P.XXXXX.P',
+                    'P..XXX..P',
+                    'PP..X..PP',
+                    '.PPPPPPP.'
+                ],
+                palette: { 'P': '#3fd8ff', 'X': '#eaffff', '.': null }
+            },
+            // заморозка — снежинка
+            freeze: {
+                color: '#7fc8ff',
+                frame: [
+                    '.PPPPPPP.',
+                    'PPX.X.XPP',
+                    'P..XXX..P',
+                    'P.XXXXX.P',
+                    'P..XXX..P',
+                    'PPX.X.XPP',
+                    '.PPPPPPP.'
+                ],
+                palette: { 'P': '#7fc8ff', 'X': '#ffffff', '.': null }
+            }
+        };
 
         // ===== Звук (Web Audio, синтез без файлов) =====
         let audioCtx = null;
@@ -446,6 +485,8 @@
             lives = 3;
             level = 1;
             tripleShotTimer = 0;
+            shieldTimer = 0;
+            freezeTimer = 0;
             updateScore();
             spawnLevel();
         }
@@ -493,8 +534,10 @@
                 player.x += player.speed * dt;
             }
 
-            // Таймер тройного выстрела тает (пауза замораживает его — мы здесь не идём)
+            // Таймеры бонусов тают (пауза замораживает их — сюда мы не заходим)
             if (tripleShotTimer > 0) tripleShotTimer = Math.max(0, tripleShotTimer - deltaTime);
+            if (shieldTimer > 0) shieldTimer = Math.max(0, shieldTimer - deltaTime);
+            if (freezeTimer > 0) freezeTimer = Math.max(0, freezeTimer - deltaTime);
 
             // Обновление пуль игрока
             for (let i = bullets.length - 1; i >= 0; i--) {
@@ -538,39 +581,43 @@
                     pu.x + pu.width > player.x &&
                     pu.y < player.y + player.height &&
                     pu.y + pu.height > player.y) {
-                    powerups.splice(i, 1);
-                    tripleShotTimer = TRIPLE_SHOT_DURATION;
-                    spawnExplosion(player.x + player.width / 2, player.y, '#ff5ed0');
+                    if (pu.type === 'shield') shieldTimer = SHIELD_DURATION;
+                    else if (pu.type === 'freeze') freezeTimer = FREEZE_DURATION;
+                    else tripleShotTimer = TRIPLE_SHOT_DURATION;
+                    spawnExplosion(player.x + player.width / 2, player.y, powerupDefs[pu.type].color);
                     sndPowerup();
+                    powerups.splice(i, 1);
                 }
             }
 
-            // Обновление врагов
-            let moveDown = false;
-            let leftmost = canvas.width;
-            let rightmost = 0;
+            // Обновление врагов — при заморозке строй стоит на месте
+            if (freezeTimer <= 0) {
+                let moveDown = false;
+                let leftmost = canvas.width;
+                let rightmost = 0;
 
-            // Находим крайних врагов
-            for (let i = 0; i < enemies.length; i++) {
-                if (enemies[i].alive) {
-                    leftmost = Math.min(leftmost, enemies[i].x);
-                    rightmost = Math.max(rightmost, enemies[i].x + enemies[i].width);
+                // Находим крайних врагов
+                for (let i = 0; i < enemies.length; i++) {
+                    if (enemies[i].alive) {
+                        leftmost = Math.min(leftmost, enemies[i].x);
+                        rightmost = Math.max(rightmost, enemies[i].x + enemies[i].width);
+                    }
                 }
-            }
 
-            // Проверяем, нужно ли двигаться вниз
-            const margin = 10 * unit;
-            if (rightmost >= canvas.width - margin || leftmost <= margin) {
-                enemyDirection *= -1;
-                moveDown = true;
-            }
+                // Проверяем, нужно ли двигаться вниз
+                const margin = 10 * unit;
+                if (rightmost >= canvas.width - margin || leftmost <= margin) {
+                    enemyDirection *= -1;
+                    moveDown = true;
+                }
 
-            // Двигаем врагов
-            for (let i = 0; i < enemies.length; i++) {
-                if (enemies[i].alive) {
-                    enemies[i].x += enemyDirection * enemySpeed * dt;
-                    if (moveDown) {
-                        enemies[i].y += enemyStep;
+                // Двигаем врагов
+                for (let i = 0; i < enemies.length; i++) {
+                    if (enemies[i].alive) {
+                        enemies[i].x += enemyDirection * enemySpeed * dt;
+                        if (moveDown) {
+                            enemies[i].y += enemyStep;
+                        }
                     }
                 }
             }
@@ -599,11 +646,13 @@
                 }
             }
 
-            // Враги стреляют
-            enemyShootTimer += deltaTime;
-            if (enemyShootTimer >= enemyShootInterval) {
-                enemyShootTimer = 0;
-                shootEnemyBullet();
+            // Враги стреляют (замороженные молчат)
+            if (freezeTimer <= 0) {
+                enemyShootTimer += deltaTime;
+                if (enemyShootTimer >= enemyShootInterval) {
+                    enemyShootTimer = 0;
+                    shootEnemyBullet();
+                }
             }
 
             // Обновление пуль врагов
@@ -623,6 +672,13 @@
                     enemyBullets[i].y + bulletHeight > player.y) {
 
                     enemyBullets.splice(i, 1);
+
+                    // Щит поглощает попадание — жизнь не теряется
+                    if (shieldTimer > 0) {
+                        spawnExplosion(player.x + player.width / 2, player.y + player.height / 2, '#3fd8ff');
+                        continue;
+                    }
+
                     lives--;
                     sndHit();
                     spawnExplosion(player.x + player.width / 2, player.y + player.height / 2, '#7cf6ff');
@@ -637,15 +693,17 @@
             }
         }
 
-        // Создание падающего приза в точке (cx, cy) — центр убитого жука
+        // Создание падающего приза случайного типа в точке (cx, cy) — центр убитого жука
         function spawnPowerup(cx, cy) {
             const size = Math.round(enemyWidth * 0.7);
+            const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
             powerups.push({
                 x: cx - size / 2,
                 y: cy - size / 2,
                 width: size,
                 height: size,
-                vy: 1.7 * unit
+                vy: 1.7 * unit,
+                type: type
             });
         }
 
@@ -750,10 +808,11 @@
             drawSprite(frame, palette, e.x, e.y, e.width, e.height, null);
         }
 
-        // Капсула-приз с пульсирующим розовым свечением
+        // Капсула-приз с пульсирующим свечением своего цвета
         function drawPowerup(pu) {
+            const def = powerupDefs[pu.type];
             const blur = 10 + Math.sin(performance.now() / 150) * 5;
-            drawSprite(powerupFrame, powerupPalette, pu.x, pu.y, pu.width, pu.height, { color: '#ff5ed0', blur });
+            drawSprite(def.frame, def.palette, pu.x, pu.y, pu.width, pu.height, { color: def.color, blur });
         }
 
         function drawBackground() {
@@ -813,9 +872,34 @@
             // Игрок
             if (player.width) drawShip(player);
 
+            // Кольцо щита вокруг корабля
+            if (shieldTimer > 0 && player.width) {
+                const cx = player.x + player.width / 2;
+                const cy = player.y + player.height / 2;
+                const rad = Math.max(player.width, player.height) * 0.7 + Math.sin(performance.now() / 120) * 2;
+                ctx.save();
+                ctx.strokeStyle = '#3fd8ff';
+                ctx.globalAlpha = 0.55 + Math.sin(performance.now() / 120) * 0.2;
+                ctx.lineWidth = 2;
+                ctx.shadowColor = '#3fd8ff';
+                ctx.shadowBlur = 12;
+                ctx.beginPath();
+                ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+
             // Враги
             for (let i = 0; i < enemies.length; i++) {
                 if (enemies[i].alive) drawBug(enemies[i]);
+            }
+
+            // Морозный налёт при заморозке жуков
+            if (freezeTimer > 0) {
+                ctx.save();
+                ctx.fillStyle = 'rgba(140, 205, 255, 0.12)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
             }
 
             // Падающие призы
@@ -846,18 +930,26 @@
             // Частицы взрывов
             drawParticles();
 
-            // Индикатор активного тройного выстрела
-            if (tripleShotTimer > 0 && !gameOver) {
-                const fs = Math.max(11, Math.round(canvas.width * 0.026));
-                ctx.save();
-                ctx.font = `bold ${fs}px 'Comfortaa', sans-serif`;
-                ctx.textAlign = 'left';
-                ctx.fillStyle = '#ff5ed0';
-                ctx.shadowColor = '#ff5ed0';
-                ctx.shadowBlur = 8;
-                ctx.fillText(`✦ ТРОЙНОЙ ВЫСТРЕЛ ${(tripleShotTimer / 1000).toFixed(1)}`, fs * 0.6, fs * 1.6);
-                ctx.restore();
-                ctx.textAlign = 'left';
+            // Индикаторы активных бонусов (стопкой сверху слева)
+            if (!gameOver) {
+                const buffs = [];
+                if (tripleShotTimer > 0) buffs.push({ label: '✦ ТРОЙНОЙ ВЫСТРЕЛ', t: tripleShotTimer, color: '#ff5ed0' });
+                if (shieldTimer > 0) buffs.push({ label: '◆ ЩИТ', t: shieldTimer, color: '#3fd8ff' });
+                if (freezeTimer > 0) buffs.push({ label: '❄ ЗАМОРОЗКА', t: freezeTimer, color: '#7fc8ff' });
+                if (buffs.length) {
+                    const fs = Math.max(11, Math.round(canvas.width * 0.026));
+                    ctx.save();
+                    ctx.font = `bold ${fs}px 'Comfortaa', sans-serif`;
+                    ctx.textAlign = 'left';
+                    ctx.shadowBlur = 8;
+                    buffs.forEach((b, i) => {
+                        ctx.fillStyle = b.color;
+                        ctx.shadowColor = b.color;
+                        ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, fs * 0.6, fs * 1.6 + i * fs * 1.4);
+                    });
+                    ctx.restore();
+                    ctx.textAlign = 'left';
+                }
             }
 
             // Оверлей паузы
