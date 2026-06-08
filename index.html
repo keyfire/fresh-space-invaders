@@ -233,19 +233,13 @@
             document.body.className = 'state-' + state;
         }
 
-        // Привязка кнопки паузы к углу холста (а не к краю широкой сцены).
-        // На телефоне — справа сверху, на десктопе — слева сверху, у самого поля.
+        // Привязка кнопки паузы к правому верхнему углу холста
+        // (а не к краю широкой сцены, где она «улетала» в угол экрана).
         function positionPauseButton() {
-            const top = canvas.offsetTop + 10;
-            pauseButton.style.top = top + 'px';
-            if (isTouch) {
-                pauseButton.style.left = 'auto';
-                const fromRight = stageElement.clientWidth - (canvas.offsetLeft + canvas.offsetWidth) + 10;
-                pauseButton.style.right = fromRight + 'px';
-            } else {
-                pauseButton.style.right = 'auto';
-                pauseButton.style.left = (canvas.offsetLeft + 10) + 'px';
-            }
+            pauseButton.style.top = (canvas.offsetTop + 10) + 'px';
+            pauseButton.style.left = 'auto';
+            const fromRight = stageElement.clientWidth - (canvas.offsetLeft + canvas.offsetWidth) + 10;
+            pauseButton.style.right = fromRight + 'px';
         }
 
         // Отступ корабля от низа: на сенсорных экранах оставляем место под
@@ -1189,10 +1183,8 @@
                 if (freezeTimer > 0) buffs.push({ label: '❄ ЗАМОРОЗКА', t: freezeTimer, color: '#7fc8ff' });
                 if (buffs.length) {
                     const fs = Math.max(11, Math.round(canvas.width * 0.026));
-                    // На десктопе кнопка паузы слева — сдвигаем индикаторы правее неё.
-                    // На телефоне пауза справа, индикаторы остаются у левого края.
-                    const scl = canvas.width / (parseFloat(canvas.style.width) || canvas.width);
-                    const xStart = isTouch ? fs * 0.6 : 72 * scl;
+                    // Кнопка паузы теперь справа — индикаторы у левого края
+                    const xStart = fs * 0.6;
                     ctx.save();
                     ctx.font = `bold ${fs}px 'Comfortaa', sans-serif`;
                     ctx.textAlign = 'left';
