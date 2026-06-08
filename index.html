@@ -294,6 +294,14 @@
         let enemyShootTimer = 0;
         let enemyShootInterval = 1000; // Миллисекунды
 
+        // Босс: после каждого 5-го раунда. HP = числу пришельцев в строю.
+        let isBoss = false;
+        let boss = null;
+        // Текущая форма пришельцев — меняется каждые 5 раундов циклично
+        function currentFormIndex() {
+            return Math.floor((level - 1) / 5) % bugForms.length;
+        }
+
         // Декоративные слои
         let stars = [];
         let particles = [];
@@ -323,36 +331,51 @@
         // Цвета жуков по рядам
         const bugColors = ['#ff5e7e', '#ff9f45', '#ffe14a', '#7cff6b', '#6bd5ff'];
 
-        // Пиксельные спрайты жуков, 2 кадра анимации (мельче клетки + детали).
-        // Символы: X тело, D тень, L блик, e глаз, '.' прозрачно. Цвет тела — по ряду.
-        const bugFrames = [
+        // Пять форм пришельцев (по 2 кадра анимации). Меняются каждые 5 раундов
+        // циклично. Символы: X тело, D тень, L блик, e глаз, '.' прозрачно.
+        const bugForms = [
+            // 0 — кальмар
             [
-                '....X...X....',
-                '.....X.X.....',
-                '....XXXXX....',
-                '....eXXXe....',
-                '...XXXXXXX...',
-                '...XXXXXXX...',
-                '...XDDDDDX...',
-                '...XLLLLLX...',
-                '...XXXXXXX...',
-                '..X..X.X..X..',
-                '.X...X.X...X.'
+                ['...XXXXX...', '..XXXXXXX..', '.XXXXXXXXX.', '.XXeXXXeXX.', '.XXXXXXXXX.', '...X.X.X...', '..X.X.X.X..', '.X.......X.'],
+                ['...XXXXX...', '..XXXXXXX..', '.XXXXXXXXX.', '.XXeXXXeXX.', '.XXXXXXXXX.', '...X.X.X...', '.X.X.X.X.X.', '..X.....X..']
             ],
+            // 1 — краб
             [
-                '....X...X....',
-                '.....X.X.....',
-                '....XXXXX....',
-                '....eXXXe....',
-                '...XXXXXXX...',
-                '...XXXXXXX...',
-                '...XDDDDDX...',
-                '...XLLLLLX...',
-                '...XXXXXXX...',
-                '..X.X...X.X..',
-                '..X..X.X..X..'
+                ['.X.......X.', '..X.X.X.X..', '.XXXXXXXXX.', 'XXXeXXXeXXX', 'XXXXXXXXXXX', 'X.XXXXXXX.X', 'X.X.....X.X', '...XX.XX...'],
+                ['.X.......X.', '..X.X.X.X..', '.XXXXXXXXX.', 'XXXeXXXeXXX', 'XXXXXXXXXXX', 'X.XXXXXXX.X', '..X.....X..', '.X.X...X.X.']
+            ],
+            // 2 — осьминог
+            [
+                ['..XXXXXXX..', '.XXXXXXXXX.', 'XXXXXXXXXXX', 'XXeXXXXXeXX', 'XXXXXXXXXXX', 'XXXXXXXXXXX', '.X.X.X.X.X.', 'X..X.X.X..X'],
+                ['..XXXXXXX..', '.XXXXXXXXX.', 'XXXXXXXXXXX', 'XXeXXXXXeXX', 'XXXXXXXXXXX', 'XXXXXXXXXXX', 'X.X.X.X.X.X', '.X..X.X..X.']
+            ],
+            // 3 — жук с усиками
+            [
+                ['..X.....X..', '...X...X...', '..XXXXXXX..', '.XeXXXXXeX.', 'XXXXXXXXXXX', 'XXXDDDDDXXX', 'XXXXXXXXXXX', '.XX..X..XX.'],
+                ['..X.....X..', '...X...X...', '..XXXXXXX..', '.XeXXXXXeX.', 'XXXXXXXXXXX', 'XXXDDDDDXXX', 'XXXXXXXXXXX', 'X.X..X..X.X']
+            ],
+            // 4 — череп
+            [
+                ['.XXXXXXXXX.', 'XXXXXXXXXXX', 'XXeeXXXeeXX', 'XXeeXXXeeXX', 'XXXXXXXXXXX', 'XXXXXXXXXXX', 'X.X.X.X.X.X', '.X.X...X.X.'],
+                ['.XXXXXXXXX.', 'XXXXXXXXXXX', 'XXeeXXXeeXX', 'XXeeXXXeeXX', 'XXXXXXXXXXX', 'XXXXXXXXXXX', '.X.X.X.X.X.', 'X.X.....X.X']
             ]
         ];
+
+        // Босс — большой детальный пришелец (своя палитра, зелёные глаза, клыки).
+        const bossFrame = [
+            '...A.......A...',
+            '...A.......A...',
+            '..LBBBBBBBBBL..',
+            '.LBBBBBBBBBBBL.',
+            'LBBeeBBBBBeeBBL',
+            'LBBeeBBBBBeeBBL',
+            'LBBBBBBBBBBBBBL',
+            '.LBBBBBBBBBBBL.',
+            '..BmBmBmBmBmB..',
+            '..D.D.D.D.D.D..',
+            '.D.D.D.D.D.D.D.'
+        ];
+        const bossPalette = { 'A': '#7a3b8f', 'B': '#c13ae0', 'L': '#e89bff', 'D': '#6a1f86', 'e': '#9dff5a', 'm': '#ffe14a', '.': null };
 
         // Пиксельный спрайт корабля (квадратный, в тон жукам).
         // H корпус, C кабина, F дюза, '.' прозрачно.
@@ -556,6 +579,12 @@
             for (const b of bullets) { b.x *= sx; b.y *= sy; }
             for (const b of enemyBullets) { b.x *= sx; b.y *= sy; }
             for (const pu of powerups) { pu.x *= sx; pu.y *= sy; pu.width = Math.round(enemyWidth * 0.7); pu.height = pu.width; }
+            if (boss) {
+                boss.x *= sx; boss.y *= sy;
+                boss.width = Math.round(canvas.width * 0.3);
+                boss.height = Math.round(boss.width * (bossFrame.length / bossFrame[0].length));
+                boss.speed = (canvas.width * 0.25) / 60;
+            }
             initStars();
         }
 
@@ -713,10 +742,50 @@
             enemyShootInterval = Math.max(350, 1000 - (level - 1) * 90);
 
             // Сбрасываем флаги уровня
+            isBoss = false;
+            boss = null;
             gameRunning = true;
             gameOver = false;
             enemyDirection = 1;
             enemyMoveDownTimer = 0;
+            enemyShootTimer = 0;
+        }
+
+        // Бой с боссом: один большой пришелец, HP = числу пришельцев в строю
+        function spawnBoss() {
+            player = {
+                x: canvas.width / 2 - playerWidth / 2,
+                y: canvas.height - playerHeight - shipBottomInset(),
+                width: playerWidth,
+                height: playerHeight,
+                speed: 5 * unit
+            };
+            enemies = [];
+            bullets = [];
+            enemyBullets = [];
+            particles = [];
+            powerups = [];
+            floatTexts = [];
+
+            const bw = Math.round(canvas.width * 0.3);
+            const bh = Math.round(bw * (bossFrame.length / bossFrame[0].length));
+            const hp = enemyRows * enemyCols;   // HP = суммарному HP всех пришельцев
+            boss = {
+                x: canvas.width / 2 - bw / 2,
+                y: Math.round(canvas.height * 0.08),
+                width: bw,
+                height: bh,
+                dir: 1,
+                speed: (canvas.width * 0.25) / 60,   // px/кадр патрулирования
+                hp: hp,
+                maxHp: hp,
+                shootTimer: 0,
+                shootInterval: Math.max(500, 900 - (level - 1) * 25)
+            };
+
+            isBoss = true;
+            gameRunning = true;
+            gameOver = false;
             enemyShootTimer = 0;
         }
 
@@ -731,6 +800,8 @@
             rapidTimer = 0;
             fireHeld = false;
             fireCooldown = 0;
+            isBoss = false;
+            boss = null;
             paused = false;
             pauseButton.classList.remove('paused');
             updateScore();
@@ -738,10 +809,18 @@
             setUIState('playing');
         }
 
-        // Следующий уровень — ускорение, счёт и жизни сохраняются
-        function nextLevel() {
-            level++;
-            spawnLevel();
+        // Переход к следующему этапу: после каждого 5-го раунда — бой с боссом,
+        // победа над боссом ведёт к следующему раунду (с новой формой пришельцев).
+        function advanceStage() {
+            if (isBoss) {
+                level++;            // босс побеждён — следующий обычный раунд
+                spawnLevel();
+            } else if (level % 5 === 0) {
+                spawnBoss();        // отыграли 5-й раунд — босс
+            } else {
+                level++;
+                spawnLevel();
+            }
             updateScore();
         }
 
@@ -815,6 +894,25 @@
                     continue;
                 }
 
+                // Бой с боссом: каждое попадание снимает 1 HP
+                if (isBoss) {
+                    if (boss && bullets[i].x < boss.x + boss.width &&
+                        bullets[i].x + bulletWidth > boss.x &&
+                        bullets[i].y < boss.y + boss.height &&
+                        bullets[i].y + bulletHeight > boss.y) {
+                        boss.hp--;
+                        spawnExplosion(bullets[i].x, bullets[i].y, '#e89bff');
+                        bullets.splice(i, 1);
+                        score += 5;
+                        updateScore();
+                        if (boss.hp <= 0) {
+                            defeatBoss();
+                            return;
+                        }
+                    }
+                    continue;
+                }
+
                 // Проверка столкновения с врагами
                 for (let j = 0; j < enemies.length; j++) {
                     if (enemies[j].alive &&
@@ -867,6 +965,10 @@
                 }
             }
 
+            // Бой с боссом обновляется отдельно; иначе — логика строя
+            if (isBoss) {
+                updateBoss(deltaTime, dt);
+            } else {
             // Обновление врагов — при заморозке строй стоит на месте
             if (freezeTimer <= 0) {
                 const margin = 10 * unit;
@@ -923,8 +1025,8 @@
             }
 
             if (allDead) {
-                // Следующий уровень — ускорение и более частая стрельба
-                nextLevel();
+                // Раунд пройден — следующий этап (или босс после каждого 5-го)
+                advanceStage();
                 return;
             }
 
@@ -945,13 +1047,16 @@
                     shootEnemyBullet();
                 }
             }
+            } // конец логики строя/босса
 
-            // Обновление пуль врагов
+            // Обновление пуль врагов (общее для строя и босса)
             for (let i = enemyBullets.length - 1; i >= 0; i--) {
                 enemyBullets[i].y += 5 * unit * dt;
+                enemyBullets[i].x += (enemyBullets[i].vx || 0) * dt;
 
-                // Удаляем пули, вышедшие за границы
-                if (enemyBullets[i].y > canvas.height) {
+                // Удаляем пули, вышедшие за границы (низ или бока — для веера босса)
+                if (enemyBullets[i].y > canvas.height ||
+                    enemyBullets[i].x < -bulletWidth || enemyBullets[i].x > canvas.width) {
                     enemyBullets.splice(i, 1);
                     continue;
                 }
@@ -1027,6 +1132,44 @@
                     height: bulletHeight
                 });
             }
+        }
+
+        // ===== Босс =====
+        function updateBoss(deltaTime, dt) {
+            if (!boss) return;
+            const margin = 10 * unit;
+            // Патрулирование по горизонтали с отскоком от стен
+            boss.x += boss.dir * boss.speed * dt;
+            if (boss.x <= margin) { boss.x = margin; boss.dir = 1; }
+            if (boss.x + boss.width >= canvas.width - margin) {
+                boss.x = canvas.width - margin - boss.width;
+                boss.dir = -1;
+            }
+            // Стрельба веером
+            boss.shootTimer += deltaTime;
+            if (boss.shootTimer >= boss.shootInterval) {
+                boss.shootTimer = 0;
+                shootBossBullets();
+            }
+        }
+        function shootBossBullets() {
+            const cx = boss.x + boss.width / 2 - bulletWidth / 2;
+            const by = boss.y + boss.height * 0.85;
+            for (const vx of [-2.4 * unit, 0, 2.4 * unit]) {
+                enemyBullets.push({ x: cx, y: by, width: bulletWidth, height: bulletHeight, vx: vx });
+            }
+        }
+        function defeatBoss() {
+            // Фейерверк взрывов по корпусу
+            for (let k = 0; k < 26; k++) {
+                spawnExplosion(boss.x + Math.random() * boss.width,
+                               boss.y + Math.random() * boss.height, '#e89bff');
+            }
+            sndExplosion();
+            score += 200;
+            spawnFloatText(boss.x + boss.width / 2, boss.y + boss.height / 2, 'БОСС ПОВЕРЖЕН!', '#9dff5a');
+            updateScore();
+            advanceStage();
         }
 
         // ===== Рисование объектов =====
@@ -1134,9 +1277,10 @@
             }
         }
 
-        // Жук-враг — детальный пиксельный спрайт, цвет по ряду, без яркого свечения
+        // Жук-враг — пиксельный спрайт текущей формы, цвет по ряду
         function drawBug(e) {
-            const frame = bugFrames[Math.floor(performance.now() / 450) % bugFrames.length];
+            const frames = bugForms[currentFormIndex()];
+            const frame = frames[Math.floor(performance.now() / 450) % frames.length];
             const base = bugColors[e.row % bugColors.length];
             const palette = {
                 'X': base,
@@ -1146,6 +1290,58 @@
                 '.': null
             };
             drawSprite(frame, palette, e.x, e.y, e.width, e.height, null);
+        }
+
+        // Босс — большой детальный спрайт с пульсирующими глазами и лёгким покачиванием
+        function drawBoss(b) {
+            const bob = Math.sin(performance.now() / 500) * b.height * 0.02;
+            // свечение тела
+            const s = drawSprite(bossFrame, bossPalette, b.x, b.y + bob, b.width, b.height,
+                                 { color: '#c13ae0', blur: 14 });
+            // пульсирующее свечение глаз
+            const glow = 6 + Math.sin(performance.now() / 180) * 4;
+            ctx.save();
+            ctx.shadowColor = '#9dff5a';
+            ctx.shadowBlur = glow;
+            ctx.fillStyle = '#bfff8a';
+            for (let r = 0; r < bossFrame.length; r++) {
+                for (let c = 0; c < bossFrame[r].length; c++) {
+                    if (bossFrame[r][c] === 'e') {
+                        ctx.fillRect(s.ox + c * s.cell, s.oy + r * s.cell, s.cell + 0.5, s.cell + 0.5);
+                    }
+                }
+            }
+            ctx.restore();
+        }
+
+        // Полоса HP босса — по центру сверху
+        function drawBossHpBar() {
+            if (!boss) return;
+            const bw = canvas.width * 0.5;
+            const bh = Math.max(8, canvas.height * 0.016);
+            const bx = (canvas.width - bw) / 2;
+            const by = canvas.height * 0.03;
+            const frac = Math.max(0, boss.hp / boss.maxHp);
+            const col = frac > 0.5 ? '#9dff5a' : (frac > 0.25 ? '#ffd166' : '#ff5e7e');
+            ctx.save();
+            ctx.fillStyle = 'rgba(10, 8, 18, 0.7)';
+            ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
+            ctx.fillStyle = col;
+            ctx.shadowColor = col;
+            ctx.shadowBlur = 8;
+            ctx.fillRect(bx, by, bw * frac, bh);
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'rgba(230, 240, 255, 0.5)';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(bx, by, bw, bh);
+            ctx.fillStyle = '#e89bff';
+            ctx.font = `bold ${Math.round(canvas.width * 0.026)}px 'Comfortaa', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#c13ae0';
+            ctx.shadowBlur = 8;
+            ctx.fillText('БОСС  ' + boss.hp + ' / ' + boss.maxHp, canvas.width / 2, by + bh + Math.round(canvas.width * 0.032));
+            ctx.restore();
+            ctx.textAlign = 'left';
         }
 
         // Капсула-приз с пульсирующим свечением своего цвета
@@ -1236,9 +1432,13 @@
                 ctx.restore();
             }
 
-            // Враги
-            for (let i = 0; i < enemies.length; i++) {
-                if (enemies[i].alive) drawBug(enemies[i]);
+            // Враги: босс или обычный строй
+            if (isBoss) {
+                if (boss) { drawBoss(boss); drawBossHpBar(); }
+            } else {
+                for (let i = 0; i < enemies.length; i++) {
+                    if (enemies[i].alive) drawBug(enemies[i]);
+                }
             }
 
             // Морозный налёт при заморозке жуков
