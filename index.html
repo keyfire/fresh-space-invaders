@@ -592,7 +592,7 @@
 
             // Обновление врагов — при заморозке строй стоит на месте
             if (freezeTimer <= 0) {
-                let moveDown = false;
+                const margin = 10 * unit;
                 let leftmost = canvas.width;
                 let rightmost = 0;
 
@@ -604,20 +604,34 @@
                     }
                 }
 
-                // Проверяем, нужно ли двигаться вниз
-                const margin = 10 * unit;
-                if (rightmost >= canvas.width - margin || leftmost <= margin) {
+                // Разворот вниз только если строй реально упирается в стену
+                // ПО ХОДУ движения. Без проверки направления строй, оказавшийся
+                // за линией стены (например, после заморозки), разворачивался бы
+                // каждый кадр и моментально сыпался вниз.
+                let moveDown = false;
+                if ((enemyDirection > 0 && rightmost >= canvas.width - margin) ||
+                    (enemyDirection < 0 && leftmost <= margin)) {
                     enemyDirection *= -1;
                     moveDown = true;
                 }
 
                 // Двигаем врагов
+                const dx = enemyDirection * enemySpeed * dt;
                 for (let i = 0; i < enemies.length; i++) {
                     if (enemies[i].alive) {
-                        enemies[i].x += enemyDirection * enemySpeed * dt;
-                        if (moveDown) {
-                            enemies[i].y += enemyStep;
-                        }
+                        enemies[i].x += dx;
+                        if (moveDown) enemies[i].y += enemyStep;
+                    }
+                }
+
+                // Прижимаем строй внутрь поля, чтобы он не «застревал» за стеной
+                leftmost += dx; rightmost += dx;
+                let clamp = 0;
+                if (rightmost > canvas.width - margin) clamp = (canvas.width - margin) - rightmost;
+                else if (leftmost < margin) clamp = margin - leftmost;
+                if (clamp !== 0) {
+                    for (let i = 0; i < enemies.length; i++) {
+                        if (enemies[i].alive) enemies[i].x += clamp;
                     }
                 }
             }
