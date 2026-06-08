@@ -135,6 +135,12 @@
         let stars = [];
         let particles = [];
 
+        // Призы (падают с убитых жуков) и активный бонус
+        let powerups = [];
+        let tripleShotTimer = 0;              // мс оставшегося действия тройного выстрела
+        const POWERUP_DROP_CHANCE = 0.12;     // шанс выпадения приза с жука
+        const TRIPLE_SHOT_DURATION = 5000;    // длительность тройного выстрела, мс
+
         // Цвета жуков по рядам
         const bugColors = ['#ff5e7e', '#ff9f45', '#ffe14a', '#7cff6b', '#6bd5ff'];
 
@@ -184,6 +190,18 @@
             '.....F.F.....'
         ];
         const shipPalette = { 'H': '#c2c8e0', 'C': '#1b9dff', 'F': '#ff9d00', '.': null };
+
+        // Капсула-приз «тройной выстрел»: P корпус, X три патрона, '.' прозрачно
+        const powerupFrame = [
+            '.PPPPPPP.',
+            'PP.....PP',
+            'P.X.X.X.P',
+            'P.X.X.X.P',
+            'P.X.X.X.P',
+            'PP.....PP',
+            '.PPPPPPP.'
+        ];
+        const powerupPalette = { 'P': '#ff5ed0', 'X': '#fff59a', '.': null };
 
         // ===== Звук (Web Audio, синтез без файлов) =====
         let audioCtx = null;
@@ -236,6 +254,21 @@
             o.connect(g); g.connect(audioCtx.destination);
             o.start(t); o.stop(t + 0.3);
         }
+        function sndPowerup() {
+            if (!audioCtx) return;
+            const t = audioCtx.currentTime;
+            [523, 659, 784, 1047].forEach((f, i) => {
+                const o = audioCtx.createOscillator();
+                const g = audioCtx.createGain();
+                o.type = 'square';
+                const st = t + i * 0.06;
+                o.frequency.setValueAtTime(f, st);
+                g.gain.setValueAtTime(0.06, st);
+                g.gain.exponentialRampToValueAtTime(0.0001, st + 0.13);
+                o.connect(g); g.connect(audioCtx.destination);
+                o.start(st); o.stop(st + 0.13);
+            });
+        }
 
         // ===== Адаптация под размер экрана (в т.ч. портрет iPhone) =====
         // Пересчёт игровых размеров от текущего холста
@@ -273,6 +306,7 @@
             for (const e of enemies) { e.x *= sx; e.y *= sy; e.width = enemyWidth; e.height = enemyHeight; }
             for (const b of bullets) { b.x *= sx; b.y *= sy; }
             for (const b of enemyBullets) { b.x *= sx; b.y *= sy; }
+            for (const pu of powerups) { pu.x *= sx; pu.y *= sy; pu.width = Math.round(enemyWidth * 0.7); pu.height = pu.width; }
             initStars();
         }
 
@@ -376,10 +410,11 @@
                 }
             }
 
-            // Очищаем пули и частицы
+            // Очищаем пули, частицы и падающие призы (бонус по времени сохраняется)
             bullets = [];
             enemyBullets = [];
             particles = [];
+            powerups = [];
 
             // Скорость задаётся так, чтобы строй пересекал свободное поле за фиксированное
             // время — тогда темп одинаков и в широком альбомном, и в узком портретном холсте.
@@ -410,6 +445,7 @@
             score = 0;
             lives = 3;
             level = 1;
+            tripleShotTimer = 0;
             updateScore();
             spawnLevel();
         }
@@ -457,12 +493,16 @@
                 player.x += player.speed * dt;
             }
 
+            // Таймер тройного выстрела тает (пауза замораживает его — мы здесь не идём)
+            if (tripleShotTimer > 0) tripleShotTimer = Math.max(0, tripleShotTimer - deltaTime);
+
             // Обновление пуль игрока
             for (let i = bullets.length - 1; i >= 0; i--) {
                 bullets[i].y -= 7 * unit * dt;
+                bullets[i].x += (bullets[i].vx || 0) * dt;
 
-                // Удаляем пули, вышедшие за границы
-                if (bullets[i].y < 0) {
+                // Удаляем пули, вышедшие за границы (верх или бока — для угловых)
+                if (bullets[i].y < 0 || bullets[i].x < -bulletWidth || bullets[i].x > canvas.width) {
                     bullets.splice(i, 1);
                     continue;
                 }
@@ -476,17 +516,32 @@
                         bullets[i].y + bulletHeight > enemies[j].y) {
 
                         enemies[j].alive = false;
-                        spawnExplosion(
-                            enemies[j].x + enemies[j].width / 2,
-                            enemies[j].y + enemies[j].height / 2,
-                            bugColors[enemies[j].row % bugColors.length]
-                        );
+                        const cx = enemies[j].x + enemies[j].width / 2;
+                        const cy = enemies[j].y + enemies[j].height / 2;
+                        spawnExplosion(cx, cy, bugColors[enemies[j].row % bugColors.length]);
+                        if (Math.random() < POWERUP_DROP_CHANCE) spawnPowerup(cx, cy);
                         sndExplosion();
                         bullets.splice(i, 1);
                         score += 10;
                         updateScore();
                         break;
                     }
+                }
+            }
+
+            // Падающие призы: летят вниз, при касании корабля включают тройной выстрел
+            for (let i = powerups.length - 1; i >= 0; i--) {
+                const pu = powerups[i];
+                pu.y += pu.vy * dt;
+                if (pu.y > canvas.height) { powerups.splice(i, 1); continue; }
+                if (pu.x < player.x + player.width &&
+                    pu.x + pu.width > player.x &&
+                    pu.y < player.y + player.height &&
+                    pu.y + pu.height > player.y) {
+                    powerups.splice(i, 1);
+                    tripleShotTimer = TRIPLE_SHOT_DURATION;
+                    spawnExplosion(player.x + player.width / 2, player.y, '#ff5ed0');
+                    sndPowerup();
                 }
             }
 
@@ -582,15 +637,30 @@
             }
         }
 
-        // Выстрел игрока
+        // Создание падающего приза в точке (cx, cy) — центр убитого жука
+        function spawnPowerup(cx, cy) {
+            const size = Math.round(enemyWidth * 0.7);
+            powerups.push({
+                x: cx - size / 2,
+                y: cy - size / 2,
+                width: size,
+                height: size,
+                vy: 1.7 * unit
+            });
+        }
+
+        // Выстрел игрока. При активном бонусе — три пули: прямо + две под углом
         function shootPlayerBullet() {
             if (!gameRunning || gameOver || paused || !player.width) return;
-            bullets.push({
-                x: player.x + player.width / 2 - bulletWidth / 2,
-                y: player.y - bulletHeight,
-                width: bulletWidth,
-                height: bulletHeight
-            });
+            const cx = player.x + player.width / 2 - bulletWidth / 2;
+            const top = player.y - bulletHeight;
+            if (tripleShotTimer > 0) {
+                bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: 0 });
+                bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: -2.6 * unit });
+                bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: 2.6 * unit });
+            } else {
+                bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: 0 });
+            }
             sndShoot();
         }
 
@@ -680,6 +750,12 @@
             drawSprite(frame, palette, e.x, e.y, e.width, e.height, null);
         }
 
+        // Капсула-приз с пульсирующим розовым свечением
+        function drawPowerup(pu) {
+            const blur = 10 + Math.sin(performance.now() / 150) * 5;
+            drawSprite(powerupFrame, powerupPalette, pu.x, pu.y, pu.width, pu.height, { color: '#ff5ed0', blur });
+        }
+
         function drawBackground() {
             const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
             bg.addColorStop(0, '#0a0a2a');
@@ -742,6 +818,9 @@
                 if (enemies[i].alive) drawBug(enemies[i]);
             }
 
+            // Падающие призы
+            for (let i = 0; i < powerups.length; i++) drawPowerup(powerups[i]);
+
             // Пули игрока (светящиеся)
             ctx.save();
             ctx.shadowColor = '#7cff6b';
@@ -766,6 +845,20 @@
 
             // Частицы взрывов
             drawParticles();
+
+            // Индикатор активного тройного выстрела
+            if (tripleShotTimer > 0 && !gameOver) {
+                const fs = Math.max(11, Math.round(canvas.width * 0.026));
+                ctx.save();
+                ctx.font = `bold ${fs}px 'JetBrains Mono', monospace`;
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#ff5ed0';
+                ctx.shadowColor = '#ff5ed0';
+                ctx.shadowBlur = 8;
+                ctx.fillText(`✦ ТРОЙНОЙ ВЫСТРЕЛ ${(tripleShotTimer / 1000).toFixed(1)}`, fs * 0.6, fs * 1.6);
+                ctx.restore();
+                ctx.textAlign = 'left';
+            }
 
             // Оверлей паузы
             if (paused && !gameOver) {
