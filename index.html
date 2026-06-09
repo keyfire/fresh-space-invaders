@@ -14,7 +14,7 @@
     <meta name="apple-mobile-web-app-title" content="КосмоЖуки">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
     <style>
         html, body {
             height: 100%;
@@ -28,7 +28,7 @@
         body {
             margin: 0;
             background: radial-gradient(circle at 50% 0%, #16163a 0%, #05050f 70%);
-            font-family: 'Pixelify Sans', 'Segoe UI', system-ui, sans-serif;
+            font-family: 'VT323', 'Segoe UI', system-ui, monospace;
             color: #e8e8ff;
             -webkit-user-select: none;
             user-select: none;
@@ -893,7 +893,7 @@
         function drawFloatTexts() {
             const fs = Math.max(14, Math.round(canvas.width * 0.034));
             ctx.save();
-            ctx.font = `bold ${fs}px 'Pixelify Sans', sans-serif`;
+            ctx.font = `bold ${fs}px 'VT323', monospace`;
             ctx.textAlign = 'center';
             for (const f of floatTexts) {
                 ctx.globalAlpha = Math.max(0, Math.min(1, f.life));
@@ -1618,7 +1618,7 @@
             ctx.strokeRect(bx, by, bw, bh);
             const labelCol = bossDefs[boss.form || 0].bodyGlow;
             ctx.fillStyle = labelCol;
-            ctx.font = `bold ${Math.round(canvas.width * 0.026)}px 'Pixelify Sans', sans-serif`;
+            ctx.font = `bold ${Math.round(canvas.width * 0.026)}px 'VT323', monospace`;
             ctx.textAlign = 'center';
             ctx.shadowColor = labelCol;
             ctx.shadowBlur = 8;
@@ -1675,7 +1675,7 @@
                 drawParticles();
                 const titleSize = Math.round(canvas.width * 0.06);
                 ctx.fillStyle = '#7cf6ff';
-                ctx.font = `bold ${titleSize}px 'Pixelify Sans', sans-serif`;
+                ctx.font = `bold ${titleSize}px 'VT323', monospace`;
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#1b9dff';
                 ctx.shadowBlur = 20;
@@ -1683,7 +1683,7 @@
                 ctx.shadowBlur = 0;
                 if (hadRecord) {
                     ctx.fillStyle = '#ffd166';
-                    ctx.font = `${Math.round(titleSize * 0.42)}px 'Pixelify Sans', sans-serif`;
+                    ctx.font = `${Math.round(titleSize * 0.42)}px 'VT323', monospace`;
                     ctx.fillText(`Рекорд: ${bestScore} · уровень ${bestLevel}`, canvas.width / 2, canvas.height / 2 - titleSize * 0.7);
                 }
                 ctx.textAlign = 'left';
@@ -1781,7 +1781,7 @@
                     // Кнопка паузы теперь справа — индикаторы у левого края
                     const xStart = fs * 0.6;
                     ctx.save();
-                    ctx.font = `bold ${fs}px 'Pixelify Sans', sans-serif`;
+                    ctx.font = `bold ${fs}px 'VT323', monospace`;
                     ctx.textAlign = 'left';
                     ctx.shadowBlur = 8;
                     buffs.forEach((b, i) => {
@@ -1800,14 +1800,14 @@
                 ctx.fillStyle = 'rgba(5, 5, 15, 0.55)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#7cf6ff';
-                ctx.font = `bold ${pSize}px 'Pixelify Sans', sans-serif`;
+                ctx.font = `bold ${pSize}px 'VT323', monospace`;
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#1b9dff';
                 ctx.shadowBlur = 18;
                 ctx.fillText('ПАУЗА', canvas.width / 2, canvas.height / 2 - pSize * 0.3);
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = '#cfd3f5';
-                ctx.font = `${Math.round(pSize * 0.4)}px 'Pixelify Sans', sans-serif`;
+                ctx.font = `${Math.round(pSize * 0.4)}px 'VT323', monospace`;
                 ctx.fillText('▷ сверху или Esc', canvas.width / 2, canvas.height / 2 + pSize * 0.6);
                 ctx.textAlign = 'left';
             }
@@ -1819,17 +1819,17 @@
                 ctx.fillStyle = 'rgba(5, 5, 15, 0.6)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#ff7c9c';
-                ctx.font = `bold ${bigSize}px 'Pixelify Sans', sans-serif`;
+                ctx.font = `bold ${bigSize}px 'VT323', monospace`;
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#ff2b5e';
                 ctx.shadowBlur = 18;
                 ctx.fillText('ИГРА ОКОНЧЕНА', canvas.width / 2, canvas.height / 2 - bigSize * 2.2);
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = '#e8e8ff';
-                ctx.font = `${smallSize}px 'Pixelify Sans', sans-serif`;
+                ctx.font = `${smallSize}px 'VT323', monospace`;
                 ctx.fillText(`Ваш счёт: ${score}`, canvas.width / 2, canvas.height / 2 - bigSize * 0.6);
                 ctx.fillStyle = '#ffd166';
-                ctx.font = `${Math.round(smallSize * 0.82)}px 'Pixelify Sans', sans-serif`;
+                ctx.font = `${Math.round(smallSize * 0.82)}px 'VT323', monospace`;
                 ctx.fillText(`Рекорд: ${bestScore} · уровень ${bestLevel}`, canvas.width / 2, canvas.height / 2 - bigSize * 0.6 + smallSize * 1.4);
                 ctx.textAlign = 'left';
             }
@@ -1839,7 +1839,7 @@
                 const tt = performance.now();
                 const size = Math.round(canvas.width * 0.085 * (1 + Math.sin(tt / 150) * 0.06));
                 ctx.save();
-                ctx.font = `bold ${size}px 'Pixelify Sans', sans-serif`;
+                ctx.font = `bold ${size}px 'VT323', monospace`;
                 ctx.textAlign = 'center';
                 ctx.globalAlpha = Math.min(1, celebrateTimer / 400);
                 ctx.fillStyle = '#ffd166';
@@ -1855,7 +1855,7 @@
             if (bossVictoryTimer > 0) {
                 const size = Math.round(canvas.width * 0.07);
                 ctx.save();
-                ctx.font = `bold ${size}px 'Pixelify Sans', sans-serif`;
+                ctx.font = `bold ${size}px 'VT323', monospace`;
                 ctx.textAlign = 'center';
                 ctx.globalAlpha = Math.min(1, bossVictoryTimer / 350);
                 ctx.fillStyle = '#9dff5a';
