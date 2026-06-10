@@ -50,7 +50,7 @@
             text-align: center;
             font-size: clamp(8px, 2.3vw, 13px);
             line-height: 1.5;
-            text-shadow: 0 0 8px rgba(124, 246, 255, 0.6);
+            text-shadow: 0 0 4px rgba(124, 246, 255, 0.6);
         }
         .hud span { color: #7cffa1; }
         .hud .lives { color: #ff7c9c; display: inline-block; }
@@ -58,9 +58,9 @@
         /* Вспышка счётчика жизней при подборе сердечка */
         .hud .lives.flash { animation: lifeFlash 0.7s ease; }
         @keyframes lifeFlash {
-            0%   { transform: scale(1);   color: #ff7c9c; text-shadow: 0 0 8px rgba(255,124,156,0.6); }
-            30%  { transform: scale(1.6); color: #ff4d6d; text-shadow: 0 0 16px rgba(255,77,109,0.95); }
-            100% { transform: scale(1);   color: #ff7c9c; text-shadow: 0 0 8px rgba(255,124,156,0.6); }
+            0%   { transform: scale(1);   color: #ff7c9c; text-shadow: 0 0 4px rgba(255,124,156,0.6); }
+            30%  { transform: scale(1.6); color: #ff4d6d; text-shadow: 0 0 8px rgba(255,77,109,0.95); }
+            100% { transform: scale(1);   color: #ff7c9c; text-shadow: 0 0 4px rgba(255,124,156,0.6); }
         }
         .hud .sep { color: #5a6090; margin: 0 4px; }
         /* Игровое поле — занимает всё оставшееся место */
@@ -98,8 +98,17 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(220, 232, 255, 0.10);
+            background-color: rgba(220, 232, 255, 0.10);
             border: 2px solid rgba(220, 232, 255, 0.35);
+            /* угловые пиксели рамки — clip-path срезает border на ступеньках */
+            background-image:
+                linear-gradient(rgba(220,232,255,0.35), rgba(220,232,255,0.35)),
+                linear-gradient(rgba(220,232,255,0.35), rgba(220,232,255,0.35)),
+                linear-gradient(rgba(220,232,255,0.35), rgba(220,232,255,0.35)),
+                linear-gradient(rgba(220,232,255,0.35), rgba(220,232,255,0.35));
+            background-size: 4px 4px;
+            background-repeat: no-repeat;
+            background-position: 2px 2px, calc(100% - 2px) 2px, 2px calc(100% - 2px), calc(100% - 2px) calc(100% - 2px);
             color: rgba(230, 240, 255, 0.75);
             cursor: pointer;
             padding: 0;
@@ -112,7 +121,7 @@
                 8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px)
             );
         }
-        .ctrl:active { background: rgba(220, 232, 255, 0.20); }
+        .ctrl:active { background-color: rgba(220, 232, 255, 0.20); }
 
         /* Кнопка паузы — пиксельный квадрат справа сверху, видна только в игре */
         .pause-btn {
@@ -155,8 +164,17 @@
             width: 80%;
             max-width: calc(100% - 115px);   /* оставляем место под кнопку «Огонь» */
             height: 58px;
-            background: rgba(220, 232, 255, 0.08);
+            background-color: rgba(220, 232, 255, 0.08);
             border: 2px solid rgba(220, 232, 255, 0.3);
+            /* угловые пиксели рамки (см. .ctrl) */
+            background-image:
+                linear-gradient(rgba(220,232,255,0.3), rgba(220,232,255,0.3)),
+                linear-gradient(rgba(220,232,255,0.3), rgba(220,232,255,0.3)),
+                linear-gradient(rgba(220,232,255,0.3), rgba(220,232,255,0.3)),
+                linear-gradient(rgba(220,232,255,0.3), rgba(220,232,255,0.3));
+            background-size: 4px 4px;
+            background-repeat: no-repeat;
+            background-position: 2px 2px, calc(100% - 2px) 2px, 2px calc(100% - 2px), calc(100% - 2px) calc(100% - 2px);
             touch-action: none;
             display: flex;
             align-items: center;
@@ -175,7 +193,7 @@
             right: 14px;
             bottom: calc(env(safe-area-inset-bottom) + 4px);
             width: 74px;
-            height: 74px;
+            height: 70px;
             font-size: 10px;
             letter-spacing: 0;
             flex-direction: column;
@@ -902,7 +920,7 @@
                 ctx.globalAlpha = Math.max(0, Math.min(1, f.life));
                 ctx.fillStyle = f.color;
                 ctx.shadowColor = f.color;
-                ctx.shadowBlur = 12;
+                ctx.shadowBlur = 6;
                 ctx.fillText(f.text, f.x, f.y);
             }
             ctx.restore();
@@ -1624,7 +1642,7 @@
             ctx.font = `bold ${Math.round(canvas.width * 0.026)}px 'Press Start 2P', monospace`;
             ctx.textAlign = 'center';
             ctx.shadowColor = labelCol;
-            ctx.shadowBlur = 8;
+            ctx.shadowBlur = 4;
             ctx.fillText('БОСС  ' + boss.hp + ' / ' + boss.maxHp, canvas.width / 2, by + bh + Math.round(canvas.width * 0.032));
             ctx.restore();
             ctx.textAlign = 'left';
@@ -1681,7 +1699,7 @@
                 ctx.font = `bold ${titleSize}px 'Press Start 2P', monospace`;
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#1b9dff';
-                ctx.shadowBlur = 20;
+                ctx.shadowBlur = 10;
                 ctx.fillText('КОСМИЧЕСКИЕ ЖУКИ', canvas.width / 2, canvas.height / 2 - titleSize * 1.8);
                 ctx.shadowBlur = 0;
                 if (hadRecord) {
@@ -1786,7 +1804,7 @@
                     ctx.save();
                     ctx.font = `bold ${fs}px 'Press Start 2P', monospace`;
                     ctx.textAlign = 'left';
-                    ctx.shadowBlur = 8;
+                    ctx.shadowBlur = 4;
                     buffs.forEach((b, i) => {
                         ctx.fillStyle = b.color;
                         ctx.shadowColor = b.color;
@@ -1806,7 +1824,7 @@
                 ctx.font = `bold ${pSize}px 'Press Start 2P', monospace`;
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#1b9dff';
-                ctx.shadowBlur = 18;
+                ctx.shadowBlur = 9;
                 ctx.fillText('ПАУЗА', canvas.width / 2, canvas.height / 2 - pSize * 0.3);
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = '#cfd3f5';
@@ -1825,7 +1843,7 @@
                 ctx.font = `bold ${bigSize}px 'Press Start 2P', monospace`;
                 ctx.textAlign = 'center';
                 ctx.shadowColor = '#ff2b5e';
-                ctx.shadowBlur = 18;
+                ctx.shadowBlur = 9;
                 ctx.fillText('ИГРА ОКОНЧЕНА', canvas.width / 2, canvas.height / 2 - bigSize * 2.2);
                 ctx.shadowBlur = 0;
                 ctx.fillStyle = '#e8e8ff';
@@ -1847,7 +1865,7 @@
                 ctx.globalAlpha = Math.min(1, celebrateTimer / 400);
                 ctx.fillStyle = '#ffd166';
                 ctx.shadowColor = '#ff7c9c';
-                ctx.shadowBlur = 26;
+                ctx.shadowBlur = 13;
                 ctx.fillText('НОВЫЙ РЕКОРД!', canvas.width / 2, canvas.height * 0.3);
                 ctx.restore();
                 ctx.globalAlpha = 1;
@@ -1863,7 +1881,7 @@
                 ctx.globalAlpha = Math.min(1, bossVictoryTimer / 350);
                 ctx.fillStyle = '#9dff5a';
                 ctx.shadowColor = '#3aff7a';
-                ctx.shadowBlur = 22;
+                ctx.shadowBlur = 11;
                 ctx.fillText('БОСС ПОВЕРЖЕН!', canvas.width / 2, canvas.height / 2);
                 ctx.restore();
                 ctx.globalAlpha = 1;
