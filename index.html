@@ -44,17 +44,12 @@
         }
         /* Счёт/жизни/уровень — наверху вместо заголовка, с отступом под «чёлку» */
         .hud {
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            z-index: 2;
-            pointer-events: none;
-            box-sizing: border-box;
-            padding: calc(env(safe-area-inset-top) + 8px) 8px 4px;
             text-align: center;
             font-size: clamp(8px, 2.3vw, 13px);
-            background: linear-gradient(180deg, rgba(5,5,15,0.55) 0%, rgba(5,5,15,0) 100%);
+            padding: 0 8px 8px;
             line-height: 1.5;
             text-shadow: 0 0 2px rgba(124, 246, 255, 0.6);
+            white-space: nowrap;
         }
         .hud span { color: #7cffa1; }
         .hud .lives { color: #ff7c9c; display: inline-block; }
@@ -75,6 +70,17 @@
             width: 100%;
             display: flex;
             justify-content: center;
+            align-items: center;
+        }
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .canvas-wrap {
+            position: relative;
+            display: inline-flex;
+            flex-direction: column;
             align-items: center;
         }
         canvas {
@@ -217,9 +223,13 @@
 <body>
     <div class="game-container">
         <div class="stage">
-            <div class="hud">Счёт: <span id="score">0</span><span class="sep">·</span>Жизни: <span id="lives" class="lives">3</span><span class="sep">·</span>Уровень: <span id="level" class="level">1</span></div>
-            <canvas id="gameCanvas" width="800" height="600"></canvas>
-            <button class="ctrl pause-btn" id="pauseButton" aria-label="Пауза"></button>
+            <div class="game-area">
+                <div class="hud">Счёт: <span id="score">0</span><span class="sep">·</span>Жизни: <span id="lives" class="lives">3</span><span class="sep">·</span>Уровень: <span id="level" class="level">1</span></div>
+                <div class="canvas-wrap">
+                    <canvas id="gameCanvas" width="800" height="600"></canvas>
+                    <button class="ctrl pause-btn" id="pauseButton" aria-label="Пауза"></button>
+                </div>
+            </div>
             <div class="touch-controls">
                 <div class="ctrl move-pad" id="movePad">&lt; &gt;</div>
                 <button class="ctrl fire-btn" id="fireButton" aria-label="Выстрел">ОГОНЬ</button>
@@ -254,14 +264,6 @@
             document.body.className = 'state-' + state;
         }
 
-        // Привязка кнопки паузы к правому верхнему углу холста
-        // (а не к краю широкой сцены, где она «улетала» в угол экрана).
-        function positionPauseButton() {
-            pauseButton.style.top = (canvas.offsetTop + 10) + 'px';
-            pauseButton.style.left = 'auto';
-            const fromRight = stageElement.clientWidth - (canvas.offsetLeft + canvas.offsetWidth) + 10;
-            pauseButton.style.right = fromRight + 'px';
-        }
 
         // Отступ корабля от низа: на сенсорных экранах оставляем место под
         // нижние контролы (трек движения и кнопку «Огонь»), чтобы он не прятался.
@@ -795,7 +797,6 @@
             canvas.height = Math.round(cssH * dpr);
             computeLayout();
             rescaleEntities(oldW, oldH);
-            positionPauseButton();
         }
 
         // ===== Звёздное небо =====
