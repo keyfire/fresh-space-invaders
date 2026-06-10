@@ -20,7 +20,6 @@
             height: 100%;
             overflow: hidden;
         }
-        :root { --sat: env(safe-area-inset-top, 0px); }
         /* Фон на корневом элементе заполняет весь экран, включая зоны под
            «чёлкой» и индикатором; иначе в standalone снизу белая полоса. */
         html {
@@ -269,10 +268,12 @@
         // Сенсорное устройство — показываем тач-контролы и приподнимаем корабль над ними
         const isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
         const FONT_FAMILY = "'Press Start 2P', monospace";
-        // Safe-area inset для «чёлки» на iPhone — читаем из CSS-свойства :root
+        // Safe-area inset для «чёлки» на iPhone — читаем из padding у HUD
+        // (он уже использует env(safe-area-inset-top) и точно разрешён браузером)
         let safeAreaTop = 0;
         function readSafeArea() {
-            safeAreaTop = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
+            if (!hudElement) return;
+            safeAreaTop = parseFloat(getComputedStyle(hudElement).paddingTop) || 0;
         }
         // Уровни свечения текста (ctx.shadowBlur) — уменьшены вдвое
         const TEXT_GLOW_SMALL = 2;    // метки бонусов и HUD
@@ -802,14 +803,16 @@
             const dpr = Math.min(window.devicePixelRatio || 1, 2);
             // Сцена флексом занимает всё доступное место
             const availW = Math.max(240, (stageElement.clientWidth || window.innerWidth) - 8);
-            let availH = Math.max(320, (stageElement.clientHeight || window.innerHeight) - 8);
+            let availH = (stageElement.clientHeight || window.innerHeight);
             // На десктопе HUD в потоке выше холста — вычитаем его высоту.
             // На touch он position: absolute и не занимает места.
             if (!isTouch) {
+                availH = Math.max(320, availH - 8);
                 const hudH = hudElement ? Math.max(0, hudElement.offsetHeight) : 0;
                 availH = Math.max(320, availH - hudH);
             } else {
                 readSafeArea();
+                availH = Math.max(320, availH);
             }
             const portrait = availH > availW;
             let cssW, cssH;
