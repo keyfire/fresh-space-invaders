@@ -90,7 +90,8 @@
             }
         }
 
-        /* Единый «прозрачный» стиль для оверлей-контролов */
+        /* Единый «прозрачный» пиксельный стиль для оверлей-контролов:
+           прямые углы со ступенчатым срезом, чёткая рамка, без размытий */
         .ctrl {
             position: absolute;
             z-index: 5;
@@ -98,43 +99,46 @@
             align-items: center;
             justify-content: center;
             background: rgba(220, 232, 255, 0.10);
-            border: 1.5px solid rgba(220, 232, 255, 0.30);
+            border: 2px solid rgba(220, 232, 255, 0.35);
             color: rgba(230, 240, 255, 0.75);
-            box-shadow: 0 0 12px rgba(120, 160, 220, 0.15);
-            -webkit-backdrop-filter: blur(2px);
-            backdrop-filter: blur(2px);
             cursor: pointer;
             padding: 0;
             touch-action: none;
+            border-radius: 0;
+            clip-path: polygon(
+                0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0,
+                calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, 100% 8px,
+                100% calc(100% - 8px), calc(100% - 4px) calc(100% - 8px), calc(100% - 4px) calc(100% - 4px), calc(100% - 8px) calc(100% - 4px), calc(100% - 8px) 100%,
+                8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px)
+            );
         }
         .ctrl:active { background: rgba(220, 232, 255, 0.20); }
 
-        /* Кнопка паузы — кружок слева сверху, виден только в игре */
+        /* Кнопка паузы — пиксельный квадрат справа сверху, видна только в игре */
         .pause-btn {
             display: none;
             top: 10px;          /* стартовое значение; точная привязка к холсту — в JS */
             right: 10px;
             width: 44px;
             height: 44px;
-            border-radius: 50%;
-            gap: 4px;
+            gap: 5px;
         }
         body.state-playing .pause-btn { display: flex; }
         .pause-btn::before, .pause-btn::after {
             content: '';
-            width: 5px;
-            height: 16px;
-            border-radius: 1.5px;
+            width: 6px;
+            height: 18px;
             background: rgba(230, 240, 255, 0.8);
         }
-        /* В паузе значок превращается в «play» (треугольник) */
+        /* В паузе значок превращается в ступенчатый пиксельный «play» */
         .pause-btn.paused::before {
-            width: 0; height: 0;
-            border-radius: 0;
-            background: transparent;
-            border-left: 14px solid rgba(230, 240, 255, 0.8);
-            border-top: 9px solid transparent;
-            border-bottom: 9px solid transparent;
+            width: 15px;
+            height: 21px;
+            background: rgba(230, 240, 255, 0.8);
+            clip-path: polygon(
+                0 0, 33.4% 0, 33.4% 14.3%, 66.7% 14.3%, 66.7% 28.6%, 100% 28.6%,
+                100% 71.4%, 66.7% 71.4%, 66.7% 85.7%, 33.4% 85.7%, 33.4% 100%, 0 100%
+            );
         }
         .pause-btn.paused::after { display: none; }
 
@@ -151,38 +155,37 @@
             width: 80%;
             max-width: calc(100% - 115px);   /* оставляем место под кнопку «Огонь» */
             height: 58px;
-            border-radius: 29px;
             background: rgba(220, 232, 255, 0.08);
-            border: 1.5px solid rgba(220, 232, 255, 0.28);
-            -webkit-backdrop-filter: blur(2px);
-            backdrop-filter: blur(2px);
+            border: 2px solid rgba(220, 232, 255, 0.3);
             touch-action: none;
             display: flex;
             align-items: center;
             justify-content: center;
             color: rgba(230, 240, 255, 0.45);
-            font-size: 20px;
+            font-size: 14px;
             letter-spacing: 8px;
+            clip-path: polygon(
+                0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0,
+                calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, 100% 8px,
+                100% calc(100% - 8px), calc(100% - 4px) calc(100% - 8px), calc(100% - 4px) calc(100% - 4px), calc(100% - 8px) calc(100% - 4px), calc(100% - 8px) 100%,
+                8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px)
+            );
         }
         .fire-btn {
             right: 14px;
             bottom: calc(env(safe-area-inset-bottom) + 4px);
             width: 74px;
             height: 74px;
-            border-radius: 50%;
-            font-size: 13px;
-            letter-spacing: 1px;
-            font-weight: bold;
+            font-size: 10px;
+            letter-spacing: 0;
             flex-direction: column;
         }
         .fire-btn::before {
             content: '';
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
+            width: 12px;
+            height: 12px;
             background: rgba(230, 240, 255, 0.75);
-            box-shadow: 0 0 8px rgba(230, 240, 255, 0.5);
-            margin-bottom: 3px;
+            margin-bottom: 6px;
         }
 
         /* Центральная кнопка старт/заново — в меню и после проигрыша */
@@ -219,7 +222,7 @@
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <button class="ctrl pause-btn" id="pauseButton" aria-label="Пауза"></button>
             <div class="touch-controls">
-                <div class="move-pad" id="movePad">‹ ›</div>
+                <div class="move-pad" id="movePad">&lt; &gt;</div>
                 <button class="ctrl fire-btn" id="fireButton" aria-label="Выстрел">ОГОНЬ</button>
             </div>
             <button class="center-btn" id="startButton">Начать игру</button>
@@ -1777,7 +1780,7 @@
                 if (rapidTimer > 0) buffs.push({ label: '> ОЧЕРЕДЬ', t: rapidTimer, color: '#ff9d2e' });
                 if (doubleShotTimer > 0) buffs.push({ label: '> ДВОЙНОЙ', t: doubleShotTimer, color: '#b6ff5e' });
                 if (buffs.length) {
-                    const fs = Math.max(11, Math.round(canvas.width * 0.026));
+                    const fs = Math.max(9, Math.round(canvas.width * 0.018));
                     // Кнопка паузы теперь справа — индикаторы у левого края
                     const xStart = fs * 0.6;
                     ctx.save();
