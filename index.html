@@ -271,7 +271,8 @@
         const FONT_FAMILY = "'Press Start 2P', monospace";
         // Safe-area inset для «чёлки» — читаем из :root (--sat: env(...))
         let safeAreaTop = 0;
-        function readSafeArea() {
+        let hudBottom = 0;   // низ HUD в координатах canvas (только touch)
+        function readSafeArea(dpr) {
             // env() гарантированно резолвится в custom property, читаем через CSSOM
             let val = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
             // Fallback: читаем из paddingTop HUD (там тоже env())
@@ -284,7 +285,7 @@
                 val = parseFloat(getComputedStyle(el).paddingTop) || 0;
                 document.body.removeChild(el);
             }
-            safeAreaTop = val;
+            safeAreaTop = Math.round(val * dpr);
         }
         // Уровни свечения текста (ctx.shadowBlur) — уменьшены вдвое
         const TEXT_GLOW_SMALL = 2;    // метки бонусов и HUD
@@ -821,7 +822,9 @@
                 const hudH = hudElement ? Math.max(0, hudElement.offsetHeight) : 0;
                 availH = Math.max(320, availH - hudH);
             } else {
-                readSafeArea();
+                readSafeArea(dpr);
+                // Низ HUD в координатах canvas (HUD absolute, canvas absolute — оба top:0)
+                hudBottom = Math.round((hudElement?.getBoundingClientRect().bottom - canvas.getBoundingClientRect().top) * dpr);
             }
             const portrait = availH > availW;
             let cssW, cssH;
@@ -1624,7 +1627,7 @@
             const bw = canvas.width * 0.5;
             const bh = Math.max(8, canvas.height * 0.016);
             const bx = (canvas.width - bw) / 2;
-            const by = canvas.height * 0.03 + safeAreaTop + (isTouch ? 20 : 0);
+            const by = isTouch ? hudBottom + 4 : canvas.height * 0.03;
             const frac = Math.max(0, boss.hp / boss.maxHp);
             const col = frac > 0.5 ? '#9dff5a' : (frac > 0.25 ? '#ffd166' : '#ff5e7e');
             ctx.save();
@@ -1783,7 +1786,7 @@
             buffs.forEach((b, i) => {
                 ctx.fillStyle = b.color;
                 ctx.shadowColor = b.color;
-                ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, fs * 1.6 + i * fs * 1.4 + safeAreaTop + (isTouch ? 15 : 0));
+                ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, (isTouch ? hudBottom + 4 : fs * 1.6) + i * fs * 1.4);
             });
             ctx.restore();
         }
