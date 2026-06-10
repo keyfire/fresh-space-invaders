@@ -16,6 +16,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
+        :root { --sat: env(safe-area-inset-top, 0px); }
         html, body {
             height: 100%;
             overflow: hidden;
@@ -268,10 +269,22 @@
         // Сенсорное устройство — показываем тач-контролы и приподнимаем корабль над ними
         const isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
         const FONT_FAMILY = "'Press Start 2P', monospace";
-        // Safe-area inset для «чёлки» — читаем из HUD.paddingTop (уже с env())
+        // Safe-area inset для «чёлки» — читаем из :root (--sat: env(...))
         let safeAreaTop = 0;
         function readSafeArea() {
-            safeAreaTop = parseFloat(getComputedStyle(hudElement).paddingTop) || 0;
+            // env() гарантированно резолвится в custom property, читаем через CSSOM
+            let val = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
+            // Fallback: читаем из paddingTop HUD (там тоже env())
+            if (!val) val = parseFloat(getComputedStyle(hudElement).paddingTop) || 0;
+            // Fallback: тестовый элемент
+            if (!val && CSS.supports('padding-top', 'env(safe-area-inset-top)')) {
+                const el = document.createElement('div');
+                el.style.cssText = 'position:fixed;top:0;left:-999px;width:1px;height:1px;padding-top:env(safe-area-inset-top,0px);pointer-events:none;opacity:0';
+                document.body.appendChild(el);
+                val = parseFloat(getComputedStyle(el).paddingTop) || 0;
+                document.body.removeChild(el);
+            }
+            safeAreaTop = val;
         }
         // Уровни свечения текста (ctx.shadowBlur) — уменьшены вдвое
         const TEXT_GLOW_SMALL = 2;    // метки бонусов и HUD
