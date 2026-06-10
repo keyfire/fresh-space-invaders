@@ -20,6 +20,7 @@
             height: 100%;
             overflow: hidden;
         }
+        :root { --sat: env(safe-area-inset-top, 0px); }
         /* Фон на корневом элементе заполняет весь экран, включая зоны под
            «чёлкой» и индикатором; иначе в standalone снизу белая полоса. */
         html {
@@ -268,14 +269,10 @@
         // Сенсорное устройство — показываем тач-контролы и приподнимаем корабль над ними
         const isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
         const FONT_FAMILY = "'Press Start 2P', monospace";
-        // Safe-area inset для «чёлки» на iPhone — читаем env() через тестовый элемент
+        // Safe-area inset для «чёлки» на iPhone — читаем из CSS-свойства :root
         let safeAreaTop = 0;
         function readSafeArea() {
-            const el = document.createElement('div');
-            el.style.cssText = 'position:fixed;top:0;left:-999px;width:1px;height:1px;padding-top:env(safe-area-inset-top,0px);pointer-events:none;opacity:0';
-            document.body.appendChild(el);
-            safeAreaTop = parseFloat(getComputedStyle(el).paddingTop) || 0;
-            document.body.removeChild(el);
+            safeAreaTop = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
         }
         // Уровни свечения текста (ctx.shadowBlur) — уменьшены вдвое
         const TEXT_GLOW_SMALL = 2;    // метки бонусов и HUD
