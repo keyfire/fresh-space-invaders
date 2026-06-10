@@ -176,11 +176,8 @@
             }
             .game-area { position: relative; }
             .stage { align-items: flex-start; }
-            .canvas-wrap {
-                transform: translateY(env(safe-area-inset-top, 0px));
-            }
             .pause-btn {
-                top: 10px;
+                top: calc(10px + env(safe-area-inset-top, 0px));
             }
         }
         .move-pad {
@@ -271,7 +268,11 @@
         // Сенсорное устройство — показываем тач-контролы и приподнимаем корабль над ними
         const isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
         const FONT_FAMILY = "'Press Start 2P', monospace";
-
+        // Safe-area inset для «чёлки» — читаем из HUD.paddingTop (уже с env())
+        let safeAreaTop = 0;
+        function readSafeArea() {
+            safeAreaTop = parseFloat(getComputedStyle(hudElement).paddingTop) || 0;
+        }
         // Уровни свечения текста (ctx.shadowBlur) — уменьшены вдвое
         const TEXT_GLOW_SMALL = 2;    // метки бонусов и HUD
         const TEXT_GLOW_FLOAT = 3;    // всплывающие надписи (+1 ЖИЗНЬ)
@@ -806,6 +807,8 @@
             if (!isTouch) {
                 const hudH = hudElement ? Math.max(0, hudElement.offsetHeight) : 0;
                 availH = Math.max(320, availH - hudH);
+            } else {
+                readSafeArea();
             }
             const portrait = availH > availW;
             let cssW, cssH;
@@ -928,7 +931,7 @@
             // Создаем врагов (строй центрируется по ширине холста)
             const formationW = enemyCols * enemyWidth + (enemyCols - 1) * enemySpacing;
             const startX = (canvas.width - formationW) / 2;
-            const startY = Math.round(canvas.height * 0.06);
+            const startY = Math.round(canvas.height * 0.06) + safeAreaTop;
             enemies = [];
             for (let row = 0; row < enemyRows; row++) {
                 for (let col = 0; col < enemyCols; col++) {
@@ -989,7 +992,7 @@
             const bossNum = Math.max(1, Math.round(level / 5));  // 1,2,3,... номер босса
             const spX = (canvas.width * 0.25) / 60;
             const spY = (canvas.height * 0.16) / 60;
-            const yTop = Math.round(canvas.height * 0.06);
+            const yTop = Math.round(canvas.height * 0.06) + safeAreaTop;
             // со 2-го босса — диагональ (вертикальная скорость), с 3-го — больший
             // вертикальный размах (залетает ниже)
             const yBand = bossNum >= 3 ? 0.6 : (bossNum >= 2 ? 0.42 : 0.2);
@@ -1600,7 +1603,7 @@
             const bw = canvas.width * 0.5;
             const bh = Math.max(8, canvas.height * 0.016);
             const bx = (canvas.width - bw) / 2;
-            const by = canvas.height * 0.03;
+            const by = canvas.height * 0.03 + safeAreaTop;
             const frac = Math.max(0, boss.hp / boss.maxHp);
             const col = frac > 0.5 ? '#9dff5a' : (frac > 0.25 ? '#ffd166' : '#ff5e7e');
             ctx.save();
@@ -1759,7 +1762,7 @@
             buffs.forEach((b, i) => {
                 ctx.fillStyle = b.color;
                 ctx.shadowColor = b.color;
-                ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, fs * 1.6 + i * fs * 1.4);
+                ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, fs * 1.6 + i * fs * 1.4 + safeAreaTop);
             });
             ctx.restore();
         }
