@@ -172,10 +172,13 @@
                 z-index: 2;
                 pointer-events: none;
                 background: linear-gradient(180deg, rgba(5,5,15,0.55) 0%, rgba(5,5,15,0) 100%);
-                padding-top: env(safe-area-inset-top, 0px);
             }
             .game-area { position: relative; }
-            .stage { align-items: flex-start; }
+            .stage {
+                align-items: flex-start;
+                padding-top: env(safe-area-inset-top, 0px);
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+            }
         }
         .move-pad {
             left: 10px;
@@ -795,10 +798,16 @@
             const availW = Math.max(240, (stageElement.clientWidth || window.innerWidth) - 8);
             let availH = Math.max(320, (stageElement.clientHeight || window.innerHeight) - 8);
             // На десктопе HUD в потоке выше холста — вычитаем его высоту.
-            // На touch он position: absolute и не занимает места.
+            // На touch он position: absolute и не занимает места, но у stage
+            // есть padding для safe-area — вычитаем его, чтобы холст не вылез.
             if (!isTouch) {
                 const hudH = hudElement ? Math.max(0, hudElement.offsetHeight) : 0;
                 availH = Math.max(320, availH - hudH);
+            } else {
+                const cs = getComputedStyle(stageElement);
+                const padTop = parseFloat(cs.paddingTop) || 0;
+                const padBot = parseFloat(cs.paddingBottom) || 0;
+                availH = Math.max(320, availH - padTop - padBot);
             }
             const portrait = availH > availW;
             let cssW, cssH;
