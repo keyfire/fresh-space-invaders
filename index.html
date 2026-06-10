@@ -46,7 +46,7 @@
         .hud {
             text-align: center;
             font-size: clamp(8px, 2.3vw, 13px);
-            padding: 0 8px 8px;
+            padding: env(safe-area-inset-top) 8px 8px;
             line-height: 1.5;
             text-shadow: 0 0 2px rgba(124, 246, 255, 0.6);
             white-space: nowrap;
@@ -165,7 +165,6 @@
         .touch-controls { display: none; }
         @media (pointer: coarse) {
             body.state-playing .touch-controls { display: block; }
-            .pause-btn { top: calc(env(safe-area-inset-top) + 30px); }
         }
         .move-pad {
             left: 10px;
@@ -1580,7 +1579,7 @@
             const bw = canvas.width * 0.5;
             const bh = Math.max(8, canvas.height * 0.016);
             const bx = (canvas.width - bw) / 2;
-            const by = canvas.height * (isTouch ? 0.055 : 0.03);
+            const by = canvas.height * 0.03;
             const frac = Math.max(0, boss.hp / boss.maxHp);
             const col = frac > 0.5 ? '#9dff5a' : (frac > 0.25 ? '#ffd166' : '#ff5e7e');
             ctx.save();
@@ -1731,7 +1730,6 @@
             }
             if (!buffs.length) return;
             const fs = Math.max(9, Math.round(canvas.width * 0.018 * (isTouch ? 1.25 : 1)));
-            const yBase = fs * 1.6 + (isTouch ? canvas.height * 0.03 : 0);
             const xStart = fs * 0.6;
             ctx.save();
             ctx.font = `bold ${fs}px ${FONT_FAMILY}`;
@@ -1740,7 +1738,7 @@
             buffs.forEach((b, i) => {
                 ctx.fillStyle = b.color;
                 ctx.shadowColor = b.color;
-                ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, yBase + i * fs * 1.4);
+                ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, fs * 1.6 + i * fs * 1.4);
             });
             ctx.restore();
         }
