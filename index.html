@@ -166,7 +166,15 @@
         .touch-controls { display: none; }
         @media (pointer: coarse) {
             body.state-playing .touch-controls { display: block; }
-            .stage { align-items: flex-start; }
+            .hud {
+                position: absolute;
+                top: 0; left: 0; right: 0;
+                z-index: 2;
+                pointer-events: none;
+                background: linear-gradient(180deg, rgba(5,5,15,0.55) 0%, rgba(5,5,15,0) 100%);
+                padding-top: calc(env(safe-area-inset-top, 0px) + 8px);
+            }
+            .game-area { position: relative; }
         }
         .move-pad {
             left: 10px;
@@ -785,9 +793,12 @@
             // Сцена флексом занимает всё доступное место
             const availW = Math.max(240, (stageElement.clientWidth || window.innerWidth) - 8);
             let availH = Math.max(320, (stageElement.clientHeight || window.innerHeight) - 8);
-            // HUD расположен выше холста — не даём ему переполнить сцену
-            const hudH = hudElement ? Math.max(0, hudElement.offsetHeight) : 0;
-            availH = Math.max(320, availH - hudH);
+            // На десктопе HUD в потоке выше холста — вычитаем его высоту.
+            // На touch он position: absolute и не занимает места.
+            if (!isTouch) {
+                const hudH = hudElement ? Math.max(0, hudElement.offsetHeight) : 0;
+                availH = Math.max(320, availH - hudH);
+            }
             const portrait = availH > availW;
             let cssW, cssH;
             if (portrait) {
