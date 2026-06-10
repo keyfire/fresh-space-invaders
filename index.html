@@ -46,7 +46,7 @@
         .hud {
             width: 100%;
             box-sizing: border-box;
-            padding: calc(env(safe-area-inset-top) + 8px) 8px 8px;
+            padding: calc(env(safe-area-inset-top) + 14px) 8px 8px;
             text-align: center;
             font-size: clamp(8px, 2.3vw, 13px);
             line-height: 1.5;
@@ -783,7 +783,7 @@
                 cssH = availH;
             } else {
                 cssW = Math.min(availW, 900);   // на десктопе не растягиваем на весь монитор
-                cssH = Math.min(availH, 680);
+                cssH = Math.min(availH, 748);
             }
             canvas.style.width = cssW + 'px';
             canvas.style.height = cssH + 'px';
