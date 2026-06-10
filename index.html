@@ -172,11 +172,12 @@
                 z-index: 2;
                 pointer-events: none;
                 background: linear-gradient(180deg, rgba(5,5,15,0.55) 0%, rgba(5,5,15,0) 100%);
+                padding-top: env(safe-area-inset-top, 0px);
             }
             .game-area { position: relative; }
-            .stage {
-                align-items: flex-start;
-                padding-top: env(safe-area-inset-top, 0px);
+            .stage { align-items: flex-start; }
+            .pause-btn {
+                top: calc(10px + env(safe-area-inset-top, 0px));
             }
         }
         .move-pad {
@@ -267,6 +268,15 @@
         // Сенсорное устройство — показываем тач-контролы и приподнимаем корабль над ними
         const isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
         const FONT_FAMILY = "'Press Start 2P', monospace";
+        // Safe-area inset для «чёлки» на iPhone — читаем env() через тестовый элемент
+        let safeAreaTop = 0;
+        function readSafeArea() {
+            const el = document.createElement('div');
+            el.style.cssText = 'position:fixed;top:0;left:-999px;width:1px;height:1px;padding-top:env(safe-area-inset-top,0px);pointer-events:none;opacity:0';
+            document.body.appendChild(el);
+            safeAreaTop = parseFloat(getComputedStyle(el).paddingTop) || 0;
+            document.body.removeChild(el);
+        }
         // Уровни свечения текста (ctx.shadowBlur) — уменьшены вдвое
         const TEXT_GLOW_SMALL = 2;    // метки бонусов и HUD
         const TEXT_GLOW_FLOAT = 3;    // всплывающие надписи (+1 ЖИЗНЬ)
@@ -797,15 +807,12 @@
             const availW = Math.max(240, (stageElement.clientWidth || window.innerWidth) - 8);
             let availH = Math.max(320, (stageElement.clientHeight || window.innerHeight) - 8);
             // На десктопе HUD в потоке выше холста — вычитаем его высоту.
-            // На touch он position: absolute и не занимает места, но у stage
-            // есть padding для safe-area — вычитаем его, чтобы холст не вылез.
+            // На touch он position: absolute и не занимает места.
             if (!isTouch) {
                 const hudH = hudElement ? Math.max(0, hudElement.offsetHeight) : 0;
                 availH = Math.max(320, availH - hudH);
             } else {
-                const cs = getComputedStyle(stageElement);
-                const padTop = parseFloat(cs.paddingTop) || 0;
-                availH = Math.max(320, availH - padTop);
+                readSafeArea();
             }
             const portrait = availH > availW;
             let cssW, cssH;
@@ -1600,7 +1607,7 @@
             const bw = canvas.width * 0.5;
             const bh = Math.max(8, canvas.height * 0.016);
             const bx = (canvas.width - bw) / 2;
-            const by = canvas.height * 0.03;
+            const by = canvas.height * 0.03 + safeAreaTop;
             const frac = Math.max(0, boss.hp / boss.maxHp);
             const col = frac > 0.5 ? '#9dff5a' : (frac > 0.25 ? '#ffd166' : '#ff5e7e');
             ctx.save();
@@ -1759,7 +1766,7 @@
             buffs.forEach((b, i) => {
                 ctx.fillStyle = b.color;
                 ctx.shadowColor = b.color;
-                ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, fs * 1.6 + i * fs * 1.4);
+                ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, fs * 1.6 + i * fs * 1.4 + safeAreaTop);
             });
             ctx.restore();
         }
