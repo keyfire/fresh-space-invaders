@@ -157,37 +157,14 @@
             body.state-playing .touch-controls { display: block; }
         }
         .move-pad {
-            position: absolute;
-            z-index: 5;
             left: 10px;
             bottom: calc(env(safe-area-inset-bottom) + 8px);
             width: 80%;
             max-width: calc(100% - 115px);   /* оставляем место под кнопку «Огонь» */
             height: 58px;
-            background-color: rgba(220, 232, 255, 0.08);
-            border: 2px solid rgba(220, 232, 255, 0.3);
-            /* угловые пиксели рамки (см. .ctrl) */
-            background-image:
-                linear-gradient(rgba(220,232,255,0.3), rgba(220,232,255,0.3)),
-                linear-gradient(rgba(220,232,255,0.3), rgba(220,232,255,0.3)),
-                linear-gradient(rgba(220,232,255,0.3), rgba(220,232,255,0.3)),
-                linear-gradient(rgba(220,232,255,0.3), rgba(220,232,255,0.3));
-            background-size: 4px 4px;
-            background-repeat: no-repeat;
-            background-position: 2px 2px, calc(100% - 2px) 2px, 2px calc(100% - 2px), calc(100% - 2px) calc(100% - 2px);
-            touch-action: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             color: rgba(230, 240, 255, 0.45);
             font-size: 14px;
             letter-spacing: 8px;
-            clip-path: polygon(
-                0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0,
-                calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, 100% 8px,
-                100% calc(100% - 8px), calc(100% - 4px) calc(100% - 8px), calc(100% - 4px) calc(100% - 4px), calc(100% - 8px) calc(100% - 4px), calc(100% - 8px) 100%,
-                8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px)
-            );
         }
         .fire-btn {
             right: 14px;
@@ -240,7 +217,7 @@
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <button class="ctrl pause-btn" id="pauseButton" aria-label="Пауза"></button>
             <div class="touch-controls">
-                <div class="move-pad" id="movePad">&lt; &gt;</div>
+                <div class="ctrl move-pad" id="movePad">&lt; &gt;</div>
                 <button class="ctrl fire-btn" id="fireButton" aria-label="Выстрел">ОГОНЬ</button>
             </div>
             <button class="center-btn" id="startButton">Начать игру</button>
@@ -261,6 +238,7 @@
 
         // Сенсорное устройство — показываем тач-контролы и приподнимаем корабль над ними
         const isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
+        const FONT_FAMILY = "'Press Start 2P', monospace";
 
         // Переключение состояния интерфейса: menu | playing | over
         function setUIState(state) {
@@ -330,17 +308,10 @@
 
         // Призы (падают с убитых жуков) и активные бонусы
         let powerups = [];
-        let tripleShotTimer = 0;              // мс оставшегося действия тройного выстрела
-        let shieldTimer = 0;                  // мс действия щита
-        let freezeTimer = 0;                  // мс заморозки жуков
-        let rapidTimer = 0;                   // мс действия «очереди» (скорострельность)
-        let doubleShotTimer = 0;              // мс действия двойного выстрела
+        // Таймеры бонусов: { triple, shield, freeze, rapid, double } в мс оставшегося времени
+        let bonuses = { triple: 0, shield: 0, freeze: 0, rapid: 0, double: 0 };
+        const BONUS_DURATION = { triple: 3000, shield: 5000, freeze: 3000, rapid: 2000, double: 5000 };
         const POWERUP_DROP_CHANCE = 0.14;     // шанс выпадения приза с жука
-        const TRIPLE_SHOT_DURATION = 3000;    // тройной выстрел, мс
-        const SHIELD_DURATION = 5000;         // щит, мс
-        const FREEZE_DURATION = 3000;         // заморозка жуков, мс
-        const RAPID_DURATION = 2000;          // очередь выстрелов, мс
-        const DOUBLE_SHOT_DURATION = 5000;    // двойной выстрел, мс
         const POWERUP_TYPES = ['triple', 'shield', 'freeze', 'rapid', 'double'];
         // Веса выпадения: тройной и двойной — вдвое реже остальных
         const POWERUP_WEIGHTS = { triple: 1, double: 1, shield: 2, freeze: 2, rapid: 2 };
@@ -684,19 +655,26 @@
             }
             if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
         }
-        function sndShoot() {
+        // Универсальная нота: осциллятор с указанной формой, частотой (и конечной частотой),
+        // громкостью и длительностью. offset — смещение старта (для арпеджио).
+        function sndNote(type, freqStart, freqEnd, gain, dur, offset) {
             if (!audioCtx) return;
+            const t = audioCtx.currentTime + (offset || 0);
             const o = audioCtx.createOscillator();
             const g = audioCtx.createGain();
-            o.type = 'square';
-            const t = audioCtx.currentTime;
-            o.frequency.setValueAtTime(900, t);
-            o.frequency.exponentialRampToValueAtTime(240, t + 0.14);
-            g.gain.setValueAtTime(0.05, t);
-            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14);
+            o.type = type;
+            o.frequency.setValueAtTime(freqStart, t);
+            if (freqEnd !== undefined) o.frequency.exponentialRampToValueAtTime(freqEnd, t + dur);
+            g.gain.setValueAtTime(gain, t);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
             o.connect(g); g.connect(audioCtx.destination);
-            o.start(t); o.stop(t + 0.14);
+            o.start(t); o.stop(t + dur);
         }
+        function sndSequence(type, notes, gain, dur, gap) {
+            if (!audioCtx) return;
+            notes.forEach((f, i) => sndNote(type, f, undefined, gain, dur, i * gap));
+        }
+        function sndShoot() { sndNote('square', 900, 240, 0.05, 0.14); }
         function sndExplosion() {
             if (!audioCtx) return;
             const dur = 0.32;
@@ -713,50 +691,9 @@
             src.connect(filter); filter.connect(g); g.connect(audioCtx.destination);
             src.start();
         }
-        function sndHit() {
-            if (!audioCtx) return;
-            const o = audioCtx.createOscillator();
-            const g = audioCtx.createGain();
-            o.type = 'sawtooth';
-            const t = audioCtx.currentTime;
-            o.frequency.setValueAtTime(320, t);
-            o.frequency.exponentialRampToValueAtTime(60, t + 0.3);
-            g.gain.setValueAtTime(0.12, t);
-            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
-            o.connect(g); g.connect(audioCtx.destination);
-            o.start(t); o.stop(t + 0.3);
-        }
-        function sndPowerup() {
-            if (!audioCtx) return;
-            const t = audioCtx.currentTime;
-            [523, 659, 784, 1047].forEach((f, i) => {
-                const o = audioCtx.createOscillator();
-                const g = audioCtx.createGain();
-                o.type = 'square';
-                const st = t + i * 0.06;
-                o.frequency.setValueAtTime(f, st);
-                g.gain.setValueAtTime(0.06, st);
-                g.gain.exponentialRampToValueAtTime(0.0001, st + 0.13);
-                o.connect(g); g.connect(audioCtx.destination);
-                o.start(st); o.stop(st + 0.13);
-            });
-        }
-        function sndFanfare() {
-            if (!audioCtx) return;
-            const t = audioCtx.currentTime;
-            // триумфальное восходящее арпеджио
-            [523, 659, 784, 1047, 1319].forEach((f, i) => {
-                const o = audioCtx.createOscillator();
-                const g = audioCtx.createGain();
-                o.type = 'triangle';
-                const st = t + i * 0.1;
-                o.frequency.setValueAtTime(f, st);
-                g.gain.setValueAtTime(0.09, st);
-                g.gain.exponentialRampToValueAtTime(0.0001, st + 0.35);
-                o.connect(g); g.connect(audioCtx.destination);
-                o.start(st); o.stop(st + 0.35);
-            });
-        }
+        function sndHit() { sndNote('sawtooth', 320, 60, 0.12, 0.3); }
+        function sndPowerup() { sndSequence('square', [523, 659, 784, 1047], 0.06, 0.13, 0.06); }
+        function sndFanfare() { sndSequence('triangle', [523, 659, 784, 1047, 1319], 0.09, 0.35, 0.1); }
 
         // ===== Салют «Новый рекорд» =====
         function startCelebration() {
@@ -809,7 +746,7 @@
                 player.height = playerHeight;
                 player.y = canvas.height - playerHeight - shipBottomInset();
                 player.speed = 5 * unit;
-                player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+                clampPlayerX();
             }
             for (const e of enemies) { e.x *= sx; e.y *= sy; e.width = enemyWidth; e.height = enemyHeight; }
             for (const b of bullets) { b.x *= sx; b.y *= sy; }
@@ -820,8 +757,8 @@
                 boss.x *= sx; boss.y *= sy;
                 boss.width = Math.round(canvas.width * 0.3);
                 boss.height = Math.round(boss.width * (bf.length / bf[0].length));
-                boss.vx = (boss.vx < 0 ? -1 : 1) * (canvas.width * 0.25) / 60;
-                if (boss.vy !== 0) boss.vy = (boss.vy < 0 ? -1 : 1) * (canvas.height * 0.16) / 60;
+                boss.vx = Math.sign(boss.vx) * (canvas.width * 0.25) / 60;
+                if (boss.vy !== 0) boss.vy = Math.sign(boss.vy) * (canvas.height * 0.16) / 60;
                 boss.yMin *= sy; boss.yMax *= sy;
             }
             initStars();
@@ -914,7 +851,7 @@
         function drawFloatTexts() {
             const fs = Math.max(14, Math.round(canvas.width * 0.034));
             ctx.save();
-            ctx.font = `bold ${fs}px 'Press Start 2P', monospace`;
+            ctx.font = `bold ${fs}px ${FONT_FAMILY}`;
             ctx.textAlign = 'center';
             for (const f of floatTexts) {
                 ctx.globalAlpha = Math.max(0, Math.min(1, f.life));
@@ -929,8 +866,8 @@
         }
 
         // Создание уровня (игрок + строй врагов). Счёт и жизни НЕ сбрасываются.
-        function spawnLevel() {
-            // Создаем игрока
+        // Создание объекта игрока в стандартной позиции
+        function createPlayer() {
             player = {
                 x: canvas.width / 2 - playerWidth / 2,
                 y: canvas.height - playerHeight - shipBottomInset(),
@@ -938,6 +875,20 @@
                 height: playerHeight,
                 speed: 5 * unit
             };
+        }
+
+        // Очистка массивов игровых сущностей (кроме врагов/босса — они пересоздаются)
+        function clearEntities() {
+            bullets = [];
+            enemyBullets = [];
+            particles = [];
+            powerups = [];
+            floatTexts = [];
+        }
+
+        function spawnLevel() {
+            createPlayer();
+            clearEntities();
 
             // Создаем врагов (строй центрируется по ширине холста)
             const formationW = enemyCols * enemyWidth + (enemyCols - 1) * enemySpacing;
@@ -956,13 +907,6 @@
                     });
                 }
             }
-
-            // Очищаем пули, частицы и падающие призы (бонус по времени сохраняется)
-            bullets = [];
-            enemyBullets = [];
-            particles = [];
-            powerups = [];
-            floatTexts = [];
 
             // Сложность считается ВНУТРИ цикла из 5 раундов: после каждого босса
             // (нового цикла) она «сбрасывается» к началу, но каждый цикл чуть выше —
@@ -998,19 +942,9 @@
 
         // Бой с боссом: один большой пришелец, HP = числу пришельцев в строю
         function spawnBoss() {
-            player = {
-                x: canvas.width / 2 - playerWidth / 2,
-                y: canvas.height - playerHeight - shipBottomInset(),
-                width: playerWidth,
-                height: playerHeight,
-                speed: 5 * unit
-            };
+            createPlayer();
             enemies = [];
-            bullets = [];
-            enemyBullets = [];
-            particles = [];
-            powerups = [];
-            floatTexts = [];
+            clearEntities();
 
             const form = currentFormIndex();   // форма предыдущих 5 раундов
             const def = bossDefs[form];
@@ -1051,11 +985,11 @@
             score = 0;
             lives = 3;
             level = 1;
-            tripleShotTimer = 0;
-            shieldTimer = 0;
-            freezeTimer = 0;
-            rapidTimer = 0;
-            doubleShotTimer = 0;
+            bonuses.triple = 0;
+            bonuses.shield = 0;
+            bonuses.freeze = 0;
+            bonuses.rapid = 0;
+            bonuses.double = 0;
             fireHeld = false;
             fireCooldown = 0;
             isBoss = false;
@@ -1102,6 +1036,24 @@
             livesElement.classList.add('flash');
         }
 
+        // Салют «Новый рекорд» — таймер и залпы
+        function updateCelebration(deltaTime) {
+            if (celebrateTimer <= 0) return;
+            celebrateTimer = Math.max(0, celebrateTimer - deltaTime);
+            fireworkTimer -= deltaTime;
+            if (fireworkTimer <= 0 && celebrateTimer > 400) {
+                spawnFirework();
+                fireworkTimer = 300;
+            }
+        }
+
+        // Пауза после победы над боссом: показываем надпись, затем продолжаем
+        function updateBossVictory(deltaTime) {
+            if (bossVictoryTimer <= 0) return;
+            bossVictoryTimer = Math.max(0, bossVictoryTimer - deltaTime);
+            if (bossVictoryTimer === 0) advanceStage();
+        }
+
         // Единый цикл: звёзды и частицы живут всегда, логика — только в игре
         function loop(currentTime) {
             const deltaTime = currentTime - lastTime;
@@ -1114,21 +1066,8 @@
             updateParticles(dt);
             updateFloatTexts(dt);
 
-            // Салют «Новый рекорд» живёт поверх любого состояния
-            if (celebrateTimer > 0) {
-                celebrateTimer = Math.max(0, celebrateTimer - deltaTime);
-                fireworkTimer -= deltaTime;
-                if (fireworkTimer <= 0 && celebrateTimer > 400) {
-                    spawnFirework();
-                    fireworkTimer = 300;
-                }
-            }
-
-            // Пауза после победы над боссом: показываем надпись, затем продолжаем
-            if (bossVictoryTimer > 0) {
-                bossVictoryTimer = Math.max(0, bossVictoryTimer - deltaTime);
-                if (bossVictoryTimer === 0) advanceStage();
-            }
+            updateCelebration(deltaTime);
+            updateBossVictory(deltaTime);
 
             // Игровая логика стоит на паузе во время «Босс повержен»
             if (gameRunning && !gameOver && !paused && bossVictoryTimer <= 0) {
@@ -1139,75 +1078,58 @@
             requestAnimationFrame(loop);
         }
 
-        // Обновление состояния игры
-        function update(deltaTime, dt) {
-            // Обработка движения игрока
-            if (keys.left && player.x > 0) {
-                player.x -= player.speed * dt;
-            }
-            if (keys.right && player.x < canvas.width - player.width) {
-                player.x += player.speed * dt;
-            }
+        // ===== Подфункции обновления =====
 
-            // Таймеры бонусов тают (пауза замораживает их — сюда мы не заходим)
-            if (tripleShotTimer > 0) tripleShotTimer = Math.max(0, tripleShotTimer - deltaTime);
-            if (shieldTimer > 0) shieldTimer = Math.max(0, shieldTimer - deltaTime);
-            if (freezeTimer > 0) freezeTimer = Math.max(0, freezeTimer - deltaTime);
-            if (rapidTimer > 0) rapidTimer = Math.max(0, rapidTimer - deltaTime);
-            if (doubleShotTimer > 0) doubleShotTimer = Math.max(0, doubleShotTimer - deltaTime);
+        function getFireInterval() { return bonuses.rapid > 0 ? RAPID_INTERVAL : HOLD_INTERVAL; }
 
-            // Автострельба при удержании огня. С активной «очередью» темп выше.
-            if (fireHeld) {
-                fireCooldown -= deltaTime;
-                if (fireCooldown <= 0) {
-                    shootPlayerBullet();
-                    fireCooldown = rapidTimer > 0 ? RAPID_INTERVAL : HOLD_INTERVAL;
-                }
+        // Автострельба при удержании огня
+        function updateAutoFire(deltaTime) {
+            if (!fireHeld) return;
+            fireCooldown -= deltaTime;
+            if (fireCooldown <= 0) {
+                shootPlayerBullet();
+                fireCooldown = getFireInterval();
             }
+        }
 
-            // Обновление пуль игрока
+        // Движение пуль игрока и их коллизии
+        function updatePlayerBullets(deltaTime, dt) {
             for (let i = bullets.length - 1; i >= 0; i--) {
-                bullets[i].y -= 7 * unit * dt;
-                bullets[i].x += (bullets[i].vx || 0) * dt;
+                const b = bullets[i];
+                b.y -= 7 * unit * dt;
+                b.x += (b.vx || 0) * dt;
 
-                // Удаляем пули, вышедшие за границы (верх или бока — для угловых)
-                if (bullets[i].y < 0 || bullets[i].x < -bulletWidth || bullets[i].x > canvas.width) {
+                if (b.y < 0 || b.x < -bulletWidth || b.x > canvas.width) {
                     bullets.splice(i, 1);
                     continue;
                 }
 
                 // Бой с боссом: каждое попадание снимает 1 HP
                 if (isBoss) {
-                    if (boss && bullets[i].x < boss.x + boss.width &&
-                        bullets[i].x + bulletWidth > boss.x &&
-                        bullets[i].y < boss.y + boss.height &&
-                        bullets[i].y + bulletHeight > boss.y) {
+                    if (boss && rectsOverlap(
+                        {x: b.x, y: b.y, w: bulletWidth, h: bulletHeight},
+                        {x: boss.x, y: boss.y, w: boss.width, h: boss.height}
+                    )) {
                         boss.hp--;
-                        spawnExplosion(bullets[i].x, bullets[i].y, '#e89bff');
+                        spawnExplosion(b.x, b.y, '#e89bff');
                         bullets.splice(i, 1);
                         score += 5;
                         updateScore();
-                        if (boss.hp <= 0) {
-                            defeatBoss();
-                            return;
-                        }
+                        if (boss.hp <= 0) { defeatBoss(); return true; }
                     }
                     continue;
                 }
 
                 // Проверка столкновения с врагами
                 for (let j = 0; j < enemies.length; j++) {
-                    if (enemies[j].alive &&
-                        bullets[i].x < enemies[j].x + enemies[j].width &&
-                        bullets[i].x + bulletWidth > enemies[j].x &&
-                        bullets[i].y < enemies[j].y + enemies[j].height &&
-                        bullets[i].y + bulletHeight > enemies[j].y) {
-
+                    if (enemies[j].alive && rectsOverlap(
+                        {x: b.x, y: b.y, w: bulletWidth, h: bulletHeight},
+                        {x: enemies[j].x, y: enemies[j].y, w: enemies[j].width, h: enemies[j].height}
+                    )) {
                         enemies[j].alive = false;
                         const cx = enemies[j].x + enemies[j].width / 2;
                         const cy = enemies[j].y + enemies[j].height / 2;
                         spawnExplosion(cx, cy, bugColors[enemies[j].row % bugColors.length]);
-                        // Сердечко — втрое реже и только если жизней меньше 3; иначе обычный приз
                         if (lives < 3 && Math.random() < POWERUP_DROP_CHANCE / 3) {
                             spawnPowerup(cx, cy, 'heart');
                         } else if (Math.random() < POWERUP_DROP_CHANCE) {
@@ -1221,139 +1143,108 @@
                     }
                 }
             }
+            return false;
+        }
 
-            // Падающие призы: летят вниз, при касании корабля включают тройной выстрел
+        // Падающие призы: полёт и сбор
+        function updatePowerups(dt) {
             for (let i = powerups.length - 1; i >= 0; i--) {
                 const pu = powerups[i];
                 pu.y += pu.vy * dt;
                 if (pu.y > canvas.height) { powerups.splice(i, 1); continue; }
-                if (pu.x < player.x + player.width &&
-                    pu.x + pu.width > player.x &&
-                    pu.y < player.y + player.height &&
-                    pu.y + pu.height > player.y) {
-                    if (pu.type === 'shield') shieldTimer = SHIELD_DURATION;
-                    else if (pu.type === 'freeze') freezeTimer = FREEZE_DURATION;
-                    else if (pu.type === 'rapid') rapidTimer = RAPID_DURATION;
-                    else if (pu.type === 'double') doubleShotTimer = DOUBLE_SHOT_DURATION;
-                    else if (pu.type === 'heart') {
+                if (rectsOverlap(
+                    {x: pu.x, y: pu.y, w: pu.width, h: pu.height},
+                    {x: player.x, y: player.y, w: player.width, h: player.height}
+                )) {
+                    if (pu.type === 'heart') {
                         lives++;
                         updateScore();
                         spawnFloatText(player.x + player.width / 2, player.y - player.height * 0.4, '+1 ЖИЗНЬ', '#ff6b86');
                         flashLives();
                     }
-                    else tripleShotTimer = TRIPLE_SHOT_DURATION;
+                    else bonuses[pu.type] = BONUS_DURATION[pu.type];
                     spawnExplosion(player.x + player.width / 2, player.y, powerupDefs[pu.type].color);
                     sndPowerup();
                     powerups.splice(i, 1);
                 }
             }
+        }
 
-            // Бой с боссом обновляется отдельно; иначе — логика строя
-            if (isBoss) {
-                updateBoss(deltaTime, dt);
-            } else {
-            // Обновление врагов — при заморозке строй стоит на месте
-            if (freezeTimer <= 0) {
-                const margin = 10 * unit;
-                let leftmost = canvas.width;
-                let rightmost = 0;
+        // Движение строя врагов, отскок от стен, спуск
+        function updateEnemyFormation(deltaTime, dt) {
+            if (bonuses.freeze > 0) return;
+            const margin = 10 * unit;
+            let leftmost = canvas.width;
+            let rightmost = 0;
+            let aliveCount = 0;
 
-                // Находим крайних врагов
-                for (let i = 0; i < enemies.length; i++) {
-                    if (enemies[i].alive) {
-                        leftmost = Math.min(leftmost, enemies[i].x);
-                        rightmost = Math.max(rightmost, enemies[i].x + enemies[i].width);
-                    }
-                }
-
-                // Разворот вниз только если строй реально упирается в стену
-                // ПО ХОДУ движения. Без проверки направления строй, оказавшийся
-                // за линией стены (например, после заморозки), разворачивался бы
-                // каждый кадр и моментально сыпался вниз.
-                let moveDown = false;
-                if ((enemyDirection > 0 && rightmost >= canvas.width - margin) ||
-                    (enemyDirection < 0 && leftmost <= margin)) {
-                    enemyDirection *= -1;
-                    moveDown = true;
-                }
-
-                // Двигаем врагов
-                const dx = enemyDirection * enemySpeed * dt;
-                for (let i = 0; i < enemies.length; i++) {
-                    if (enemies[i].alive) {
-                        enemies[i].x += dx;
-                        if (moveDown) enemies[i].y += enemyStep;
-                    }
-                }
-
-                // Прижимаем строй внутрь поля, чтобы он не «застревал» за стеной
-                leftmost += dx; rightmost += dx;
-                let clamp = 0;
-                if (rightmost > canvas.width - margin) clamp = (canvas.width - margin) - rightmost;
-                else if (leftmost < margin) clamp = margin - leftmost;
-                if (clamp !== 0) {
-                    for (let i = 0; i < enemies.length; i++) {
-                        if (enemies[i].alive) enemies[i].x += clamp;
-                    }
-                }
-            }
-
-            // Проверка на победу
-            let allDead = true;
+            // Один проход: границы + проверка на проигрыш (враги у дна)
             for (let i = 0; i < enemies.length; i++) {
                 if (enemies[i].alive) {
-                    allDead = false;
-                    break;
+                    aliveCount++;
+                    leftmost = Math.min(leftmost, enemies[i].x);
+                    rightmost = Math.max(rightmost, enemies[i].x + enemies[i].width);
+                    if (enemies[i].y + enemies[i].height >= player.y) {
+                        return 'lose';
+                    }
                 }
             }
 
-            if (allDead) {
-                // Раунд пройден — следующий этап (или босс после каждого 5-го)
-                advanceStage();
-                return;
+            if (aliveCount === 0) { advanceStage(); return 'win'; }
+
+            let moveDown = false;
+            if ((enemyDirection > 0 && rightmost >= canvas.width - margin) ||
+                (enemyDirection < 0 && leftmost <= margin)) {
+                enemyDirection *= -1;
+                moveDown = true;
             }
 
-            // Проверка на проигрыш (враги достигли дна)
+            // Движение + клэмпинг одним проходом
+            const dx = enemyDirection * enemySpeed * dt;
+            const newLeftmost = leftmost + dx;
+            const newRightmost = rightmost + dx;
+            let clamp = 0;
+            if (newRightmost > canvas.width - margin) clamp = (canvas.width - margin) - newRightmost;
+            else if (newLeftmost < margin) clamp = margin - newLeftmost;
+
             for (let i = 0; i < enemies.length; i++) {
-                if (enemies[i].alive && enemies[i].y + enemies[i].height >= player.y) {
-                    gameOver = true;
-                    showGameOver();
-                    return;
+                if (enemies[i].alive) {
+                    enemies[i].x += dx + clamp;
+                    if (moveDown) enemies[i].y += enemyStep;
                 }
             }
 
-            // Враги стреляют (замороженные молчат)
-            if (freezeTimer <= 0) {
+            // Стрельба врагов
+            if (bonuses.freeze <= 0) {
                 enemyShootTimer += deltaTime;
                 if (enemyShootTimer >= enemyShootInterval) {
                     enemyShootTimer = 0;
                     shootEnemyBullet();
                 }
             }
-            } // конец логики строя/босса
+            return null;
+        }
 
-            // Обновление пуль врагов (общее для строя и босса)
+        // Пули врагов: полёт и попадание в игрока
+        function updateEnemyBullets(dt) {
             for (let i = enemyBullets.length - 1; i >= 0; i--) {
-                enemyBullets[i].y += 5 * unit * dt;
-                enemyBullets[i].x += (enemyBullets[i].vx || 0) * dt;
+                const eb = enemyBullets[i];
+                eb.y += 5 * unit * dt;
+                eb.x += (eb.vx || 0) * dt;
 
-                // Удаляем пули, вышедшие за границы (низ или бока — для веера босса)
-                if (enemyBullets[i].y > canvas.height ||
-                    enemyBullets[i].x < -bulletWidth || enemyBullets[i].x > canvas.width) {
+                if (eb.y > canvas.height ||
+                    eb.x < -bulletWidth || eb.x > canvas.width) {
                     enemyBullets.splice(i, 1);
                     continue;
                 }
 
-                // Проверка столкновения с игроком
-                if (enemyBullets[i].x < player.x + player.width &&
-                    enemyBullets[i].x + bulletWidth > player.x &&
-                    enemyBullets[i].y < player.y + player.height &&
-                    enemyBullets[i].y + bulletHeight > player.y) {
-
+                if (rectsOverlap(
+                    {x: eb.x, y: eb.y, w: eb.width, h: eb.height},
+                    {x: player.x, y: player.y, w: player.width, h: player.height}
+                )) {
                     enemyBullets.splice(i, 1);
 
-                    // Щит поглощает попадание — жизнь не теряется
-                    if (shieldTimer > 0) {
+                    if (bonuses.shield > 0) {
                         spawnExplosion(player.x + player.width / 2, player.y + player.height / 2, '#3fd8ff');
                         continue;
                     }
@@ -1362,14 +1253,41 @@
                     sndHit();
                     spawnExplosion(player.x + player.width / 2, player.y + player.height / 2, '#7cf6ff');
                     updateScore();
-
-                    if (lives <= 0) {
-                        gameOver = true;
-                        showGameOver();
-                        return;
-                    }
+                    if (lives <= 0) return true;  // game over
                 }
             }
+            return false;
+        }
+
+        // Обновление состояния игры
+        function update(deltaTime, dt) {
+            // Движение игрока (клавиатура)
+            if (keys.left && player.x > 0) player.x -= player.speed * dt;
+            if (keys.right && player.x < canvas.width - player.width) player.x += player.speed * dt;
+
+            // Таймеры бонусов тают
+            for (const key of Object.keys(bonuses)) {
+                if (bonuses[key] > 0) bonuses[key] = Math.max(0, bonuses[key] - deltaTime);
+            }
+
+            updateAutoFire(deltaTime);
+
+            // Пули игрока (если босс повержен — return)
+            if (updatePlayerBullets(deltaTime, dt)) return;
+
+            updatePowerups(dt);
+
+            // Босс или логика строя
+            if (isBoss) {
+                updateBoss(deltaTime, dt);
+            } else {
+                const result = updateEnemyFormation(deltaTime, dt);
+                if (result === 'win') return;
+                if (result === 'lose') { gameOver = true; showGameOver(); return; }
+            }
+
+            // Пули врагов
+            if (updateEnemyBullets(dt)) { gameOver = true; showGameOver(); }
         }
 
         // Создание падающего приза в точке (cx, cy). Тип можно задать явно
@@ -1392,11 +1310,11 @@
             if (!gameRunning || gameOver || paused || !player.width) return;
             const cx = player.x + player.width / 2 - bulletWidth / 2;
             const top = player.y - bulletHeight;
-            if (tripleShotTimer > 0) {
+            if (bonuses.triple > 0) {
                 bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: 0 });
                 bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: -2.6 * unit });
                 bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: 2.6 * unit });
-            } else if (doubleShotTimer > 0) {
+            } else if (bonuses.double > 0) {
                 // две параллельные пули на ширине корабля (без угла)
                 const lx = player.x + player.width * 0.2 - bulletWidth / 2;
                 const rx = player.x + player.width * 0.8 - bulletWidth / 2;
@@ -1408,18 +1326,22 @@
             sndShoot();
         }
 
+        // Фабрика пуль врагов (обычных и босса)
+        function createEnemyBullet(x, y, vx) {
+            enemyBullets.push({ x: x, y: y, width: bulletWidth, height: bulletHeight, vx: vx || 0 });
+        }
+
         // Стрельба врагов
         function shootEnemyBullet() {
             // Выбираем случайного живого врага
             const aliveEnemies = enemies.filter(enemy => enemy.alive);
             if (aliveEnemies.length > 0) {
                 const randomEnemy = aliveEnemies[Math.floor(Math.random() * aliveEnemies.length)];
-                enemyBullets.push({
-                    x: randomEnemy.x + randomEnemy.width / 2 - bulletWidth / 2,
-                    y: randomEnemy.y + randomEnemy.height,
-                    width: bulletWidth,
-                    height: bulletHeight
-                });
+                createEnemyBullet(
+                    randomEnemy.x + randomEnemy.width / 2 - bulletWidth / 2,
+                    randomEnemy.y + randomEnemy.height,
+                    0
+                );
             }
         }
 
@@ -1454,7 +1376,7 @@
             const cx = boss.x + boss.width / 2 - bulletWidth / 2;
             const by = boss.y + boss.height * 0.85;
             for (const vx of [-2.4 * unit, 0, 2.4 * unit]) {
-                enemyBullets.push({ x: cx, y: by, width: bulletWidth, height: bulletHeight, vx: vx });
+                createEnemyBullet(cx, by, vx);
             }
         }
         function defeatBoss() {
@@ -1471,6 +1393,26 @@
             enemyBullets = [];           // его пули убираем, чтобы не задели в паузе
             bossVictoryTimer = 1800;     // показываем «БОСС ПОВЕРЖЕН!» и держим паузу
             // продолжение игры (advanceStage) — по истечении таймера, см. loop()
+        }
+
+        // ===== Общие утилиты =====
+
+        // Проверка пересечения двух AABB-прямоугольников
+        function rectsOverlap(a, b) {
+            return a.x < b.x + b.w && a.x + a.w > b.x &&
+                   a.y < b.y + b.h && a.y + a.h > b.y;
+        }
+
+        // Клэмпинг player.x в границы поля
+        function clampPlayerX() {
+            if (player.x < 0) player.x = 0;
+            if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
+        }
+
+        // Координаты мыши/касания в пространстве холста
+        function canvasCoord(clientX) {
+            const rect = canvas.getBoundingClientRect();
+            return (clientX - rect.left) * (canvas.width / rect.width);
         }
 
         // ===== Рисование объектов =====
@@ -1639,7 +1581,7 @@
             ctx.strokeRect(bx, by, bw, bh);
             const labelCol = bossDefs[boss.form || 0].bodyGlow;
             ctx.fillStyle = labelCol;
-            ctx.font = `bold ${Math.round(canvas.width * 0.026)}px 'Press Start 2P', monospace`;
+            ctx.font = `bold ${Math.round(canvas.width * 0.026)}px ${FONT_FAMILY}`;
             ctx.textAlign = 'center';
             ctx.shadowColor = labelCol;
             ctx.shadowBlur = 4;
@@ -1687,59 +1629,194 @@
             ctx.shadowBlur = 0;
         }
 
-        // Отрисовка игры
+        // Отрисовка массива пуль (общая для пуль игрока и врагов)
+        function drawBullets(arr, fillColor, shadowColor) {
+            if (!arr.length) return;
+            ctx.save();
+            ctx.shadowColor = shadowColor;
+            ctx.shadowBlur = 12;
+            ctx.fillStyle = fillColor;
+            for (const b of arr) {
+                ctx.fillRect(b.x, b.y, bulletWidth, bulletHeight);
+            }
+            ctx.restore();
+        }
+
+        // ===== Подфункции отрисовки =====
+
+        // Экран меню (до старта игры)
+        function drawMenuScreen() {
+            drawParticles();
+            const titleSize = Math.round(canvas.width * 0.048);
+            ctx.fillStyle = '#7cf6ff';
+            ctx.font = `bold ${titleSize}px ${FONT_FAMILY}`;
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#1b9dff';
+            ctx.shadowBlur = 10;
+            ctx.fillText('КОСМИЧЕСКИЕ ЖУКИ', canvas.width / 2, canvas.height / 2 - titleSize * 1.8);
+            ctx.shadowBlur = 0;
+            if (hadRecord) {
+                ctx.fillStyle = '#ffd166';
+                ctx.font = `${Math.round(titleSize * 0.42)}px ${FONT_FAMILY}`;
+                ctx.fillText(`Рекорд: ${bestScore} · уровень ${bestLevel}`, canvas.width / 2, canvas.height / 2 - titleSize * 0.7);
+            }
+            ctx.textAlign = 'left';
+        }
+
+        // Пиксельный полукруг-щит над кораблём
+        function drawShield() {
+            if (bonuses.shield <= 0 || !player.width) return;
+            const cell = Math.max(2, Math.min(player.width / 13, player.height / 10));
+            const cx = player.x + player.width / 2;
+            const cyc = player.y + player.height * 0.55;
+            const R = player.width * 0.66;
+            const pulse = 0.6 + Math.sin(performance.now() / 140) * 0.25;
+            const steps = Math.max(10, Math.round(Math.PI * R / cell));
+            ctx.save();
+            ctx.shadowColor = '#3fd8ff';
+            ctx.shadowBlur = 8;
+            const seen = new Set();
+            for (let s = 0; s <= steps; s++) {
+                const a = Math.PI + Math.PI * (s / steps);
+                const bx = Math.round((cx + Math.cos(a) * R) / cell) * cell;
+                const by = Math.round((cyc + Math.sin(a) * R) / cell) * cell;
+                const key = bx + ',' + by;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                const edge = Math.abs(s / steps - 0.5) * 2;
+                ctx.globalAlpha = pulse * (1 - edge * 0.35);
+                ctx.fillStyle = edge < 0.5 ? '#aef1ff' : '#3fd8ff';
+                ctx.fillRect(bx, by, cell + 0.5, cell + 0.5);
+            }
+            ctx.restore();
+        }
+
+        // Морозный налёт при заморозке жуков
+        function drawFreezeOverlay() {
+            if (bonuses.freeze <= 0) return;
+            ctx.save();
+            ctx.fillStyle = 'rgba(140, 205, 255, 0.12)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.restore();
+        }
+
+        // Индикаторы активных бонусов (стопка у левого края)
+        function drawBuffIndicators() {
+            if (gameOver) return;
+            const BONUS_LABELS = [
+                { key: 'triple', label: '> ТРОЙНОЙ ВЫСТРЕЛ', color: '#ff5ed0' },
+                { key: 'shield', label: '> ЩИТ', color: '#3fd8ff' },
+                { key: 'freeze', label: '> ЗАМОРОЗКА', color: '#7fc8ff' },
+                { key: 'rapid', label: '> ОЧЕРЕДЬ', color: '#ff9d2e' },
+                { key: 'double', label: '> ДВОЙНОЙ', color: '#b6ff5e' }
+            ];
+            const buffs = [];
+            for (const def of BONUS_LABELS) {
+                if (bonuses[def.key] > 0) buffs.push({ label: def.label, t: bonuses[def.key], color: def.color });
+            }
+            if (!buffs.length) return;
+            const fs = Math.max(9, Math.round(canvas.width * 0.018));
+            const xStart = fs * 0.6;
+            ctx.save();
+            ctx.font = `bold ${fs}px ${FONT_FAMILY}`;
+            ctx.textAlign = 'left';
+            ctx.shadowBlur = 4;
+            buffs.forEach((b, i) => {
+                ctx.fillStyle = b.color;
+                ctx.shadowColor = b.color;
+                ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, fs * 1.6 + i * fs * 1.4);
+            });
+            ctx.restore();
+        }
+
+        // Оверлей паузы
+        function drawPauseOverlay() {
+            if (!paused || gameOver) return;
+            const pSize = Math.round(canvas.width * 0.07);
+            ctx.fillStyle = 'rgba(5, 5, 15, 0.55)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#7cf6ff';
+            ctx.font = `bold ${pSize}px ${FONT_FAMILY}`;
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#1b9dff';
+            ctx.shadowBlur = 9;
+            ctx.fillText('ПАУЗА', canvas.width / 2, canvas.height / 2 - pSize * 0.3);
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#cfd3f5';
+            ctx.font = `${Math.round(pSize * 0.4)}px ${FONT_FAMILY}`;
+            ctx.fillText('СВЕРХУ ИЛИ ESC', canvas.width / 2, canvas.height / 2 + pSize * 0.6);
+            ctx.textAlign = 'left';
+        }
+
+        // Экран «ИГРА ОКОНЧЕНА»
+        function drawGameOverScreen() {
+            if (!gameOver) return;
+            const bigSize = Math.round(canvas.width * 0.05);
+            const smallSize = Math.round(canvas.width * 0.028);
+            ctx.fillStyle = 'rgba(5, 5, 15, 0.6)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#ff7c9c';
+            ctx.font = `bold ${bigSize}px ${FONT_FAMILY}`;
+            ctx.textAlign = 'center';
+            ctx.shadowColor = '#ff2b5e';
+            ctx.shadowBlur = 9;
+            ctx.fillText('ИГРА ОКОНЧЕНА', canvas.width / 2, canvas.height / 2 - bigSize * 2.2);
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#e8e8ff';
+            ctx.font = `${smallSize}px ${FONT_FAMILY}`;
+            ctx.fillText(`Ваш счёт: ${score}`, canvas.width / 2, canvas.height / 2 - bigSize * 0.6);
+            ctx.fillStyle = '#ffd166';
+            ctx.font = `${Math.round(smallSize * 0.82)}px ${FONT_FAMILY}`;
+            ctx.fillText(`Рекорд: ${bestScore} · уровень ${bestLevel}`, canvas.width / 2, canvas.height / 2 - bigSize * 0.6 + smallSize * 1.4);
+            ctx.textAlign = 'left';
+        }
+
+        // Анимированная надпись «НОВЫЙ РЕКОРД!» + салют
+        function drawCelebration() {
+            if (celebrateTimer <= 0) return;
+            const tt = performance.now();
+            const size = Math.round(canvas.width * 0.058 * (1 + Math.sin(tt / 150) * 0.06));
+            ctx.save();
+            ctx.font = `bold ${size}px ${FONT_FAMILY}`;
+            ctx.textAlign = 'center';
+            ctx.globalAlpha = Math.min(1, celebrateTimer / 400);
+            ctx.fillStyle = '#ffd166';
+            ctx.shadowColor = '#ff7c9c';
+            ctx.shadowBlur = 13;
+            ctx.fillText('НОВЫЙ РЕКОРД!', canvas.width / 2, canvas.height * 0.3);
+            ctx.restore();
+        }
+
+        // Надпись «БОСС ПОВЕРЖЕН!» после победы
+        function drawBossVictory() {
+            if (bossVictoryTimer <= 0) return;
+            const size = Math.round(canvas.width * 0.052);
+            ctx.save();
+            ctx.font = `bold ${size}px ${FONT_FAMILY}`;
+            ctx.textAlign = 'center';
+            ctx.globalAlpha = Math.min(1, bossVictoryTimer / 350);
+            ctx.fillStyle = '#9dff5a';
+            ctx.shadowColor = '#3aff7a';
+            ctx.shadowBlur = 11;
+            ctx.fillText('БОСС ПОВЕРЖЕН!', canvas.width / 2, canvas.height / 2);
+            ctx.restore();
+        }
+
+        // Отрисовка игры — основная композиция
         function draw() {
             drawBackground();
 
             // Экран меню (до старта)
             if (!gameRunning && !gameOver) {
-                drawParticles();
-                const titleSize = Math.round(canvas.width * 0.048);
-                ctx.fillStyle = '#7cf6ff';
-                ctx.font = `bold ${titleSize}px 'Press Start 2P', monospace`;
-                ctx.textAlign = 'center';
-                ctx.shadowColor = '#1b9dff';
-                ctx.shadowBlur = 10;
-                ctx.fillText('КОСМИЧЕСКИЕ ЖУКИ', canvas.width / 2, canvas.height / 2 - titleSize * 1.8);
-                ctx.shadowBlur = 0;
-                if (hadRecord) {
-                    ctx.fillStyle = '#ffd166';
-                    ctx.font = `${Math.round(titleSize * 0.42)}px 'Press Start 2P', monospace`;
-                    ctx.fillText(`Рекорд: ${bestScore} · уровень ${bestLevel}`, canvas.width / 2, canvas.height / 2 - titleSize * 0.7);
-                }
-                ctx.textAlign = 'left';
+                drawMenuScreen();
                 return;
             }
 
             // Игрок
             if (player.width) drawShip(player);
 
-            // Щит — пиксельный полукруг-«козырёк» над кораблём (в тон капсуле)
-            if (shieldTimer > 0 && player.width) {
-                const cell = Math.max(2, Math.min(player.width / 13, player.height / 10));
-                const cx = player.x + player.width / 2;
-                const cyc = player.y + player.height * 0.55;
-                const R = player.width * 0.66;
-                const pulse = 0.6 + Math.sin(performance.now() / 140) * 0.25;
-                const steps = Math.max(10, Math.round(Math.PI * R / cell));
-                ctx.save();
-                ctx.shadowColor = '#3fd8ff';
-                ctx.shadowBlur = 8;
-                const seen = new Set();
-                for (let s = 0; s <= steps; s++) {
-                    const a = Math.PI + Math.PI * (s / steps);   // верхняя дуга π..2π
-                    const bx = Math.round((cx + Math.cos(a) * R) / cell) * cell;
-                    const by = Math.round((cyc + Math.sin(a) * R) / cell) * cell;
-                    const key = bx + ',' + by;
-                    if (seen.has(key)) continue;
-                    seen.add(key);
-                    const edge = Math.abs(s / steps - 0.5) * 2;  // 0 на гребне, 1 по краям
-                    ctx.globalAlpha = pulse * (1 - edge * 0.35);
-                    ctx.fillStyle = edge < 0.5 ? '#aef1ff' : '#3fd8ff';
-                    ctx.fillRect(bx, by, cell + 0.5, cell + 0.5);
-                }
-                ctx.restore();
-            }
+            // Щит — пиксельный полукруг-«козырёк» над кораблём
+            drawShield();
 
             // Враги: босс или обычный строй
             if (isBoss) {
@@ -1751,37 +1828,16 @@
             }
 
             // Морозный налёт при заморозке жуков
-            if (freezeTimer > 0) {
-                ctx.save();
-                ctx.fillStyle = 'rgba(140, 205, 255, 0.12)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.restore();
-            }
+            drawFreezeOverlay();
 
             // Падающие призы
             for (let i = 0; i < powerups.length; i++) drawPowerup(powerups[i]);
 
             // Пули игрока (светящиеся)
-            ctx.save();
-            ctx.shadowColor = '#7cff6b';
-            ctx.shadowBlur = 12;
-            ctx.fillStyle = '#d6ffcf';
-            for (let i = 0; i < bullets.length; i++) {
-                const b = bullets[i];
-                ctx.fillRect(b.x, b.y, bulletWidth, bulletHeight);
-            }
-            ctx.restore();
+            drawBullets(bullets, '#d6ffcf', '#7cff6b');
 
             // Пули врагов (светящиеся)
-            ctx.save();
-            ctx.shadowColor = '#ff6a3d';
-            ctx.shadowBlur = 12;
-            ctx.fillStyle = '#ffd27c';
-            for (let i = 0; i < enemyBullets.length; i++) {
-                const b = enemyBullets[i];
-                ctx.fillRect(b.x, b.y, bulletWidth, bulletHeight);
-            }
-            ctx.restore();
+            drawBullets(enemyBullets, '#ffd27c', '#ff6a3d');
 
             // Частицы взрывов
             drawParticles();
@@ -1789,104 +1845,18 @@
             // Всплывающие надписи («+1 ЖИЗНЬ» и т.п.)
             drawFloatTexts();
 
-            // Индикаторы активных бонусов (стопкой сверху, правее кнопки паузы)
-            if (!gameOver) {
-                const buffs = [];
-                if (tripleShotTimer > 0) buffs.push({ label: '> ТРОЙНОЙ ВЫСТРЕЛ', t: tripleShotTimer, color: '#ff5ed0' });
-                if (shieldTimer > 0) buffs.push({ label: '> ЩИТ', t: shieldTimer, color: '#3fd8ff' });
-                if (freezeTimer > 0) buffs.push({ label: '> ЗАМОРОЗКА', t: freezeTimer, color: '#7fc8ff' });
-                if (rapidTimer > 0) buffs.push({ label: '> ОЧЕРЕДЬ', t: rapidTimer, color: '#ff9d2e' });
-                if (doubleShotTimer > 0) buffs.push({ label: '> ДВОЙНОЙ', t: doubleShotTimer, color: '#b6ff5e' });
-                if (buffs.length) {
-                    const fs = Math.max(9, Math.round(canvas.width * 0.018));
-                    // Кнопка паузы теперь справа — индикаторы у левого края
-                    const xStart = fs * 0.6;
-                    ctx.save();
-                    ctx.font = `bold ${fs}px 'Press Start 2P', monospace`;
-                    ctx.textAlign = 'left';
-                    ctx.shadowBlur = 4;
-                    buffs.forEach((b, i) => {
-                        ctx.fillStyle = b.color;
-                        ctx.shadowColor = b.color;
-                        ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, fs * 1.6 + i * fs * 1.4);
-                    });
-                    ctx.restore();
-                    ctx.textAlign = 'left';
-                }
-            }
+            // Индикаторы активных бонусов
+            drawBuffIndicators();
 
             // Оверлей паузы
-            if (paused && !gameOver) {
-                const pSize = Math.round(canvas.width * 0.07);
-                ctx.fillStyle = 'rgba(5, 5, 15, 0.55)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#7cf6ff';
-                ctx.font = `bold ${pSize}px 'Press Start 2P', monospace`;
-                ctx.textAlign = 'center';
-                ctx.shadowColor = '#1b9dff';
-                ctx.shadowBlur = 9;
-                ctx.fillText('ПАУЗА', canvas.width / 2, canvas.height / 2 - pSize * 0.3);
-                ctx.shadowBlur = 0;
-                ctx.fillStyle = '#cfd3f5';
-                ctx.font = `${Math.round(pSize * 0.4)}px 'Press Start 2P', monospace`;
-                ctx.fillText('СВЕРХУ ИЛИ ESC', canvas.width / 2, canvas.height / 2 + pSize * 0.6);
-                ctx.textAlign = 'left';
-            }
+            drawPauseOverlay();
 
-            // Если игра окончена, показываем сообщение
-            if (gameOver) {
-                const bigSize = Math.round(canvas.width * 0.05);
-                const smallSize = Math.round(canvas.width * 0.028);
-                ctx.fillStyle = 'rgba(5, 5, 15, 0.6)';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#ff7c9c';
-                ctx.font = `bold ${bigSize}px 'Press Start 2P', monospace`;
-                ctx.textAlign = 'center';
-                ctx.shadowColor = '#ff2b5e';
-                ctx.shadowBlur = 9;
-                ctx.fillText('ИГРА ОКОНЧЕНА', canvas.width / 2, canvas.height / 2 - bigSize * 2.2);
-                ctx.shadowBlur = 0;
-                ctx.fillStyle = '#e8e8ff';
-                ctx.font = `${smallSize}px 'Press Start 2P', monospace`;
-                ctx.fillText(`Ваш счёт: ${score}`, canvas.width / 2, canvas.height / 2 - bigSize * 0.6);
-                ctx.fillStyle = '#ffd166';
-                ctx.font = `${Math.round(smallSize * 0.82)}px 'Press Start 2P', monospace`;
-                ctx.fillText(`Рекорд: ${bestScore} · уровень ${bestLevel}`, canvas.width / 2, canvas.height / 2 - bigSize * 0.6 + smallSize * 1.4);
-                ctx.textAlign = 'left';
-            }
+            // Экран «ИГРА ОКОНЧЕНА»
+            drawGameOverScreen();
 
-            // Большая надпись «НОВЫЙ РЕКОРД!» поверх всего во время салюта
-            if (celebrateTimer > 0) {
-                const tt = performance.now();
-                const size = Math.round(canvas.width * 0.058 * (1 + Math.sin(tt / 150) * 0.06));
-                ctx.save();
-                ctx.font = `bold ${size}px 'Press Start 2P', monospace`;
-                ctx.textAlign = 'center';
-                ctx.globalAlpha = Math.min(1, celebrateTimer / 400);
-                ctx.fillStyle = '#ffd166';
-                ctx.shadowColor = '#ff7c9c';
-                ctx.shadowBlur = 13;
-                ctx.fillText('НОВЫЙ РЕКОРД!', canvas.width / 2, canvas.height * 0.3);
-                ctx.restore();
-                ctx.globalAlpha = 1;
-                ctx.textAlign = 'left';
-            }
-
-            // Надпись «БОСС ПОВЕРЖЕН!» в паузе после победы над боссом
-            if (bossVictoryTimer > 0) {
-                const size = Math.round(canvas.width * 0.052);
-                ctx.save();
-                ctx.font = `bold ${size}px 'Press Start 2P', monospace`;
-                ctx.textAlign = 'center';
-                ctx.globalAlpha = Math.min(1, bossVictoryTimer / 350);
-                ctx.fillStyle = '#9dff5a';
-                ctx.shadowColor = '#3aff7a';
-                ctx.shadowBlur = 11;
-                ctx.fillText('БОСС ПОВЕРЖЕН!', canvas.width / 2, canvas.height / 2);
-                ctx.restore();
-                ctx.globalAlpha = 1;
-                ctx.textAlign = 'left';
-            }
+            // Анимированные оверлеи поверх всего
+            drawCelebration();
+            drawBossVictory();
         }
 
         // Конец игры
@@ -1905,61 +1875,34 @@
             space: false
         };
 
+        const KEY_ACTIONS = {
+            'ArrowLeft': 'left', 'a': 'left', 'A': 'left',
+            'ArrowRight': 'right', 'd': 'right', 'D': 'right',
+            ' ': 'fire',
+            'Escape': 'pause', 'p': 'pause', 'P': 'pause', 'з': 'pause', 'З': 'pause'
+        };
+
         document.addEventListener('keydown', function(e) {
-            switch (e.key) {
-                case 'ArrowLeft':
-                case 'a':
-                case 'A':
-                    keys.left = true;
-                    break;
-                case 'ArrowRight':
-                case 'd':
-                case 'D':
-                    keys.right = true;
-                    break;
-                case ' ':
-                    startFire();
-                    e.preventDefault();
-                    break;
-                case 'Escape':
-                case 'p':
-                case 'P':
-                case 'з':
-                case 'З':
-                    togglePause();
-                    break;
-            }
+            const action = KEY_ACTIONS[e.key];
+            if (action === 'left') keys.left = true;
+            else if (action === 'right') keys.right = true;
+            else if (action === 'fire') { startFire(); e.preventDefault(); }
+            else if (action === 'pause') togglePause();
         });
 
         document.addEventListener('keyup', function(e) {
-            switch (e.key) {
-                case 'ArrowLeft':
-                case 'a':
-                case 'A':
-                    keys.left = false;
-                    break;
-                case 'ArrowRight':
-                case 'd':
-                case 'D':
-                    keys.right = false;
-                    break;
-                case ' ':
-                    stopFire();
-                    break;
-            }
+            const action = KEY_ACTIONS[e.key];
+            if (action === 'left') keys.left = false;
+            else if (action === 'right') keys.right = false;
+            else if (action === 'fire') stopFire();
         });
 
         // ===== Управление мышкой =====
         // Корабль следует за курсором по горизонтали (с учётом масштаба канваса)
         canvas.addEventListener('mousemove', function(e) {
             if (!gameRunning || gameOver || paused || !player.width) return;
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const mouseX = (e.clientX - rect.left) * scaleX;
-            player.x = mouseX - player.width / 2;
-            // Не выходим за границы поля
-            if (player.x < 0) player.x = 0;
-            if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
+            player.x = canvasCoord(e.clientX) - player.width / 2;
+            clampPlayerX();
         });
 
         // Выстрел по зажатию левой кнопки (удержание — автоматическая стрельба)
@@ -1991,8 +1934,7 @@
                 const dx = (t.clientX - padLastX) * scaleX * MOVE_GAIN;
                 padLastX = t.clientX;
                 player.x += dx;
-                if (player.x < 0) player.x = 0;
-                if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
+                clampPlayerX();
                 e.preventDefault();
             }
         }, { passive: false });
@@ -2011,7 +1953,7 @@
             if (fireHeld) return;          // игнорируем авто-повтор клавиши и лишние касания
             initAudio();
             fireHeld = true;
-            fireCooldown = rapidTimer > 0 ? RAPID_INTERVAL : HOLD_INTERVAL;
+            fireCooldown = getFireInterval();
             shootPlayerBullet();
         }
         function stopFire() {
