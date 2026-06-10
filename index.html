@@ -1316,7 +1316,7 @@
             // При смене заморозки — переключаем фон body
             const nowFreeze = bonuses.freeze > 0;
             if (nowFreeze !== prevFreeze) {
-                document.body.style.background = nowFreeze ? '#252241' : '#170A24';
+                document.documentElement.style.background = nowFreeze ? '#252241' : '#170A24';
                 prevFreeze = nowFreeze;
             }
 
