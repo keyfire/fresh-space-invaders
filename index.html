@@ -177,7 +177,6 @@
             .stage {
                 align-items: flex-start;
                 padding-top: env(safe-area-inset-top, 0px);
-                padding-bottom: env(safe-area-inset-bottom, 0px);
             }
         }
         .move-pad {
@@ -806,8 +805,7 @@
             } else {
                 const cs = getComputedStyle(stageElement);
                 const padTop = parseFloat(cs.paddingTop) || 0;
-                const padBot = parseFloat(cs.paddingBottom) || 0;
-                availH = Math.max(320, availH - padTop - padBot);
+                availH = Math.max(320, availH - padTop);
             }
             const portrait = availH > availW;
             let cssW, cssH;
