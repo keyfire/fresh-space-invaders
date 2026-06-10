@@ -966,7 +966,7 @@
             boss = {
                 form: form,
                 x: canvas.width / 2 - bw / 2,
-                y: yTop,
+                y: yTop + (bossNum === 1 ? 1 : 0),
                 width: bw,
                 height: bh,
                 vx: spX * (Math.random() < 0.5 ? 1 : -1),
@@ -1720,7 +1720,7 @@
                 if (bonuses[def.key] > 0) buffs.push({ label: def.label, t: bonuses[def.key], color: def.color });
             }
             if (!buffs.length) return;
-            const fs = Math.max(9, Math.round(canvas.width * 0.018));
+            const fs = Math.max(9, Math.round(canvas.width * 0.018 * (isTouch ? 1.25 : 1)));
             const xStart = fs * 0.6;
             ctx.save();
             ctx.font = `bold ${fs}px ${FONT_FAMILY}`;
