@@ -44,11 +44,15 @@
         }
         /* Счёт/жизни/уровень — наверху вместо заголовка, с отступом под «чёлку» */
         .hud {
-            width: 100%;
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            z-index: 2;
+            pointer-events: none;
             box-sizing: border-box;
-            padding: calc(env(safe-area-inset-top) + 14px) 8px 8px;
+            padding: calc(env(safe-area-inset-top) + 8px) 8px 4px;
             text-align: center;
             font-size: clamp(8px, 2.3vw, 13px);
+            background: linear-gradient(180deg, rgba(5,5,15,0.55) 0%, rgba(5,5,15,0) 100%);
             line-height: 1.5;
             text-shadow: 0 0 2px rgba(124, 246, 255, 0.6);
         }
@@ -212,8 +216,8 @@
 </head>
 <body>
     <div class="game-container">
-        <div class="hud">Счёт: <span id="score">0</span><span class="sep">·</span>Жизни: <span id="lives" class="lives">3</span><span class="sep">·</span>Уровень: <span id="level" class="level">1</span></div>
         <div class="stage">
+            <div class="hud">Счёт: <span id="score">0</span><span class="sep">·</span>Жизни: <span id="lives" class="lives">3</span><span class="sep">·</span>Уровень: <span id="level" class="level">1</span></div>
             <canvas id="gameCanvas" width="800" height="600"></canvas>
             <button class="ctrl pause-btn" id="pauseButton" aria-label="Пауза"></button>
             <div class="touch-controls">
@@ -262,7 +266,7 @@
         // Отступ корабля от низа: на сенсорных экранах оставляем место под
         // нижние контролы (трек движения и кнопку «Огонь»), чтобы он не прятался.
         function shipBottomInset() {
-            const base = Math.round(canvas.height * 0.04);
+            const base = Math.round(canvas.height * 0.02);
             if (!isTouch) return base;
             const sclY = canvas.height / (parseFloat(canvas.style.height) || canvas.height);
             return base + Math.round(96 * sclY);   // ~96px CSS под контролы + safe-area
@@ -898,7 +902,7 @@
             // Создаем врагов (строй центрируется по ширине холста)
             const formationW = enemyCols * enemyWidth + (enemyCols - 1) * enemySpacing;
             const startX = (canvas.width - formationW) / 2;
-            const startY = Math.round(canvas.height * 0.08);
+            const startY = Math.round(canvas.height * 0.06);
             enemies = [];
             for (let row = 0; row < enemyRows; row++) {
                 for (let col = 0; col < enemyCols; col++) {
