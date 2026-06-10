@@ -1783,7 +1783,7 @@
             buffs.forEach((b, i) => {
                 ctx.fillStyle = b.color;
                 ctx.shadowColor = b.color;
-                ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, fs * 1.6 + i * fs * 1.4 + safeAreaTop);
+                ctx.fillText(`${b.label} ${(b.t / 1000).toFixed(1)}`, xStart, fs * 1.6 + i * fs * 1.4 + safeAreaTop + (isTouch ? 15 : 0));
             });
             ctx.restore();
         }
