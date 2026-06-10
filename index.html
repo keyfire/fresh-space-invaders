@@ -1624,7 +1624,7 @@
             const bw = canvas.width * 0.5;
             const bh = Math.max(8, canvas.height * 0.016);
             const bx = (canvas.width - bw) / 2;
-            const by = canvas.height * 0.03 + safeAreaTop;
+            const by = canvas.height * 0.03 + safeAreaTop + (isTouch ? 20 : 0);
             const frac = Math.max(0, boss.hp / boss.maxHp);
             const col = frac > 0.5 ? '#9dff5a' : (frac > 0.25 ? '#ffd166' : '#ff5e7e');
             ctx.save();
