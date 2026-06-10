@@ -28,7 +28,7 @@
         }
         body {
             margin: 0;
-            background: radial-gradient(circle at 50% 0%, #16163a 0%, #05050f 70%);
+            background: #170A24;
             font-family: 'Press Start 2P', 'Segoe UI', system-ui, monospace;
             color: #e8e8ff;
             -webkit-user-select: none;
@@ -1311,7 +1311,15 @@
         }
 
         // Обновление состояния игры
+        let prevFreeze = false;
         function update(deltaTime, dt) {
+            // При смене заморозки — переключаем фон body
+            const nowFreeze = bonuses.freeze > 0;
+            if (nowFreeze !== prevFreeze) {
+                document.body.style.background = nowFreeze ? '#252241' : '#170A24';
+                prevFreeze = nowFreeze;
+            }
+
             // Движение игрока (клавиатура)
             if (keys.left && player.x > 0) player.x -= player.speed * dt;
             if (keys.right && player.x < canvas.width - player.width) player.x += player.speed * dt;
