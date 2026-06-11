@@ -1979,9 +1979,15 @@
         // Трек-полоса слева: относительный свайп с ускорением — короткого
         // движения хватает, чтобы пройти всё поле.
         const MOVE_GAIN = 1.9;
+        const PAD_TAP_FIRE_MS = 1000;   // макс. пауза между тапами для выстрела
         let padTouchId = null, padLastX = 0;
+        let lastPadUp = 0;              // время отрыва пальца от трека (для тап-выстрела)
         movePad.addEventListener('touchstart', function(e) {
             initAudio();
+            // Игра одним пальцем: повторный тап по треку (< 1 с после отрыва) — выстрел
+            if (lastPadUp && performance.now() - lastPadUp < PAD_TAP_FIRE_MS) {
+                shootPlayerBullet();
+            }
             const t = e.changedTouches[0];
             padTouchId = t.identifier;
             padLastX = t.clientX;
@@ -2002,7 +2008,10 @@
         }, { passive: false });
         function endPad(e) {
             for (const t of e.changedTouches) {
-                if (t.identifier === padTouchId) padTouchId = null;
+                if (t.identifier === padTouchId) {
+                    padTouchId = null;
+                    lastPadUp = performance.now();   // запоминаем отрыв для тап-выстрела
+                }
             }
         }
         movePad.addEventListener('touchend', endPad);
