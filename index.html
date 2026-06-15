@@ -1136,9 +1136,10 @@
 
         function getFireInterval() { return bonuses.rapid > 0 ? RAPID_INTERVAL : HOLD_INTERVAL; }
 
-        // Автострельба при удержании огня
+        // Автострельба при удержании огня. При активной «очереди» удержание
+        // пальца на треке движения тоже даёт поток (игра одним пальцем).
         function updateAutoFire(deltaTime) {
-            if (!fireHeld) return;
+            if (!fireHeld && !(padHeld && bonuses.rapid > 0)) return;
             fireCooldown -= deltaTime;
             if (fireCooldown <= 0) {
                 shootPlayerBullet();
@@ -1982,6 +1983,7 @@
         const PAD_TAP_FIRE_MS = 250;   // макс. пауза между тапами для выстрела
         let padTouchId = null, padLastX = 0;
         let lastPadUp = 0;              // время отрыва пальца от трека (для тап-выстрела)
+        let padHeld = false;           // палец на треке (для «очереди» одним пальцем)
         movePad.addEventListener('touchstart', function(e) {
             initAudio();
             // Игра одним пальцем: повторный тап по треку (< 1 с после отрыва) — выстрел
@@ -1991,6 +1993,7 @@
             const t = e.changedTouches[0];
             padTouchId = t.identifier;
             padLastX = t.clientX;
+            padHeld = true;
             e.preventDefault();
         }, { passive: false });
         movePad.addEventListener('touchmove', function(e) {
@@ -2010,6 +2013,7 @@
             for (const t of e.changedTouches) {
                 if (t.identifier === padTouchId) {
                     padTouchId = null;
+                    padHeld = false;
                     lastPadUp = performance.now();   // запоминаем отрыв для тап-выстрела
                 }
             }
