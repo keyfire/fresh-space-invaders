@@ -1012,10 +1012,11 @@
             // со 2-го босса — диагональ (вертикальная скорость), с 3-го — больший
             // вертикальный размах (залетает ниже)
             const yBand = bossNum >= 3 ? 0.6 : (bossNum >= 2 ? 0.42 : 0.2);
+            const bossCell = bw / def.frame[0].length;   // размер «субпикселя» босса
             boss = {
                 form: form,
                 x: canvas.width / 2 - bw / 2,
-                y: yTop + (bossNum === 1 ? 1 + 2 * unit : 0),
+                y: yTop + (bossNum === 1 ? Math.round(1 + 2 * unit + 2 * bossCell) : 0),
                 width: bw,
                 height: bh,
                 vx: spX * (Math.random() < 0.5 ? 1 : -1),
@@ -1136,10 +1137,12 @@
 
         function getFireInterval() { return bonuses.rapid > 0 ? RAPID_INTERVAL : HOLD_INTERVAL; }
 
-        // Автострельба при удержании огня. При активной «очереди» удержание
-        // пальца на треке движения тоже даёт поток (игра одним пальцем).
+        // Автострельба при удержании огня. При любом стреляющем призе (очередь,
+        // тройной, двойной) удержание пальца на треке тоже даёт поток — чтобы
+        // призы множественного выстрела работали при игре одним пальцем.
         function updateAutoFire(deltaTime) {
-            if (!fireHeld && !(padHeld && bonuses.rapid > 0)) return;
+            const padAutoFire = padHeld && (bonuses.rapid > 0 || bonuses.triple > 0 || bonuses.double > 0);
+            if (!fireHeld && !padAutoFire) return;
             fireCooldown -= deltaTime;
             if (fireCooldown <= 0) {
                 shootPlayerBullet();
