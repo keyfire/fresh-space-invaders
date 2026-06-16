@@ -1005,8 +1005,9 @@
             const bw = Math.round(canvas.width * 0.3);
             const bh = Math.round(bw * (def.frame.length / def.frame[0].length));
             const bossNum = Math.max(1, Math.round(level / 5));  // 1,2,3,... номер босса
-            // HP = сумме HP пришельцев; каждый следующий босс на 15% живучее
-            const hp = Math.round(enemyRows * enemyCols * (1 + 0.15 * (bossNum - 1)));
+            // HP = сумме HP пришельцев; каждый следующий босс на +5 живучее
+            // (ровные числа: 30, 35, 40, 45, 50, ...)
+            const hp = enemyRows * enemyCols + 5 * (bossNum - 1);
             const spX = (canvas.width * 0.25) / 60;
             const spY = (canvas.height * 0.16) / 60;
             const yTop = Math.round(canvas.height * 0.06) + safeAreaTop;
