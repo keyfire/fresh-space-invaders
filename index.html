@@ -359,6 +359,35 @@
         let droneFireTimer = 0;
         let armorReady = false, armorTimer = 0;  // мини-автощит
         let lastUpgradeText = '';   // подпись апгрейда в баннере победы
+        let lastUpgradeKey = '';    // ключ апгрейда — для иконки в баннере
+
+        // Уникальные пиксельные иконки апгрейдов (для баннера победы)
+        const upgradeIcons = {
+            // крылья с пушками — корабль с широкими крыльями и дульцами по краям
+            wings: {
+                glow: '#9aa0c8',
+                frame: ['....X....', '...XXX...', '..XXXXX..', 'GXXXXXXXG', 'GXXXXXXXG', '.XXXXXXX.', '..XX.XX..', '.X.....X.'],
+                palette: { 'X': '#c2c8e0', 'G': '#ff9d00', '.': null }
+            },
+            // дроны-спутники — кораблик с двумя дронами по бокам
+            drones: {
+                glow: '#2bd1ff',
+                frame: ['....X....', '...XCX...', 'D.XXXXX.D', 'D.XXXXX.D', '..XXXXX..', '...XXX...', '..X.X.X..', '.........'],
+                palette: { 'X': '#c2c8e0', 'C': '#1b9dff', 'D': '#7cf6ff', '.': null }
+            },
+            // пробивные пули — копьё-пуля сквозь осколки строя
+            pierce: {
+                glow: '#9dff5a',
+                frame: ['....A....', '...AAA...', '..AAAAA..', 'XX.AAA.XX', '....A....', '....A....', '....A....', '....A....', '.........'],
+                palette: { 'A': '#eaffff', 'X': '#ff5e7e', '.': null }
+            },
+            // броня — стальной щит-герб
+            armor: {
+                glow: '#8fa0c8',
+                frame: ['.XXXXXXX.', 'XXXXXXXXX', 'XLXXXXXLX', 'XXXXXXXXX', 'XXXXXXXXX', '.XXXXXXX.', '..XXXXX..', '...XXX...', '....X....'],
+                palette: { 'X': '#8fa0c8', 'L': '#d6e0ff', '.': null }
+            }
+        };
 
         // Декоративные слои
         let stars = [];
@@ -1066,7 +1095,7 @@
             bossVictoryTimer = 0;
             // сброс апгрейдов
             upgrades.wings = upgrades.drones = upgrades.pierce = upgrades.armor = 0;
-            drones = []; droneFireTimer = 0; armorReady = false; armorTimer = 0; lastUpgradeText = '';
+            drones = []; droneFireTimer = 0; armorReady = false; armorTimer = 0; lastUpgradeText = ''; lastUpgradeKey = '';
             paused = false;
             // Новая игра — салют можно показать снова; рекорд берём актуальный
             recordCelebrated = false;
@@ -1532,6 +1561,7 @@
             upgrades[key]++;
             if (key === 'drones') rebuildDrones();
             if (key === 'armor') { armorReady = true; armorTimer = 0; }
+            lastUpgradeKey = key;
             lastUpgradeText = UPGRADE_NAMES[key] + (upgrades[key] > 1 ? ' ' + ROMAN[upgrades[key]] : '');
             sndFanfare();
         }
@@ -2003,13 +2033,22 @@
             ctx.shadowColor = '#3aff7a';
             ctx.shadowBlur = TEXT_GLOW_LARGE;
             ctx.fillText('БОСС ПОВЕРЖЕН!', canvas.width / 2, canvas.height / 2);
-            // Полученный апгрейд
+            // Полученный апгрейд: иконка над подписью (без перекрытия)
             if (lastUpgradeText) {
+                const ic = upgradeIcons[lastUpgradeKey];
+                const isz = Math.round(canvas.width * 0.12);
+                const iconY = canvas.height / 2 + size * 1.2;
+                if (ic) {
+                    drawSprite(ic.frame, ic.palette, canvas.width / 2 - isz / 2,
+                               iconY, isz, isz, { color: ic.glow, blur: 8 });
+                }
                 const us = Math.round(canvas.width * 0.034);
                 ctx.font = `bold ${us}px ${FONT_FAMILY}`;
+                ctx.textAlign = 'center';
                 ctx.fillStyle = '#ffd166';
                 ctx.shadowColor = '#ff9d2e';
-                ctx.fillText('АПГРЕЙД: ' + lastUpgradeText, canvas.width / 2, canvas.height / 2 + size * 1.6);
+                ctx.shadowBlur = TEXT_GLOW_LARGE;
+                ctx.fillText('АПГРЕЙД: ' + lastUpgradeText, canvas.width / 2, iconY + isz + us * 1.3);
             }
             ctx.restore();
         }
