@@ -347,6 +347,19 @@
             return Math.floor((level - 1) / 5) % bugForms.length;
         }
 
+        // ===== Перманентные апгрейды корабля (по одному с каждого босса) =====
+        // wings — крылья с пушками, drones — дроны-спутники,
+        // pierce — пробивные пули, armor — мини-автощит. 0 = нет, 1..MAX уровень.
+        let upgrades = { wings: 0, drones: 0, pierce: 0, armor: 0 };
+        const UPGRADE_KEYS = ['wings', 'drones', 'pierce', 'armor'];
+        const UPGRADE_MAX = 3;
+        const UPGRADE_NAMES = { wings: 'КРЫЛЬЯ', drones: 'ДРОНЫ', pierce: 'ПРОБОЙ', armor: 'БРОНЯ' };
+        const ROMAN = ['', 'I', 'II', 'III', 'IV'];
+        let drones = [];            // спутники-дроны: {cx, cy, side, slot}
+        let droneFireTimer = 0;
+        let armorReady = false, armorTimer = 0;  // мини-автощит
+        let lastUpgradeText = '';   // подпись апгрейда в баннере победы
+
         // Декоративные слои
         let stars = [];
         let particles = [];
@@ -1005,9 +1018,8 @@
             const bw = Math.round(canvas.width * 0.3);
             const bh = Math.round(bw * (def.frame.length / def.frame[0].length));
             const bossNum = Math.max(1, Math.round(level / 5));  // 1,2,3,... номер босса
-            // HP = сумме HP пришельцев; каждый следующий босс на +5 живучее
-            // (ровные числа: 30, 35, 40, 45, 50, ...)
-            const hp = enemyRows * enemyCols + 5 * (bossNum - 1);
+            // Ровные числа HP, +5 за каждого следующего: 30, 35, 40, 45, 50, ...
+            const hp = 25 + 5 * bossNum;
             const spX = (canvas.width * 0.25) / 60;
             const spY = (canvas.height * 0.16) / 60;
             const yTop = Math.round(canvas.height * 0.06) + safeAreaTop;
@@ -1052,6 +1064,9 @@
             isBoss = false;
             boss = null;
             bossVictoryTimer = 0;
+            // сброс апгрейдов
+            upgrades.wings = upgrades.drones = upgrades.pierce = upgrades.armor = 0;
+            drones = []; droneFireTimer = 0; armorReady = false; armorTimer = 0; lastUpgradeText = '';
             paused = false;
             // Новая игра — салют можно показать снова; рекорд берём актуальный
             recordCelebrated = false;
@@ -1164,13 +1179,13 @@
                     continue;
                 }
 
-                // Бой с боссом: каждое попадание снимает 1 HP
+                // Бой с боссом: пробивные пули бьют сильнее (1 + уровень pierce)
                 if (isBoss) {
                     if (boss && rectsOverlap(
                         {x: b.x, y: b.y, w: bulletWidth, h: bulletHeight},
                         {x: boss.x, y: boss.y, w: boss.width, h: boss.height}
                     )) {
-                        boss.hp--;
+                        boss.hp -= 1 + (b.pierce || 0);
                         spawnExplosion(b.x, b.y, '#e89bff');
                         bullets.splice(i, 1);
                         score += 5;
@@ -1196,9 +1211,11 @@
                             spawnPowerup(cx, cy);
                         }
                         sndExplosion();
-                        bullets.splice(i, 1);
                         score += 10;
                         updateScore();
+                        // Пробивные пули летят дальше сквозь строй
+                        if (b.pierce > 0) { b.pierce--; }
+                        else { bullets.splice(i, 1); }
                         break;
                     }
                 }
@@ -1308,6 +1325,13 @@
                         spawnExplosion(player.x + player.width / 2, player.y + player.height / 2, '#3fd8ff');
                         continue;
                     }
+                    // Броня (апгрейд): поглощает попадание и уходит на перезарядку
+                    if (armorReady) {
+                        armorReady = false; armorTimer = 0;
+                        spawnExplosion(player.x + player.width / 2, player.y + player.height / 2, '#c2c8e0');
+                        sndHit();
+                        continue;
+                    }
 
                     lives--;
                     sndHit();
@@ -1339,6 +1363,13 @@
             }
 
             updateAutoFire(deltaTime);
+            updateDrones(deltaTime);
+
+            // Перезарядка брони (мини-автощит)
+            if (upgrades.armor > 0 && !armorReady) {
+                armorTimer += deltaTime;
+                if (armorTimer >= armorCooldown()) { armorReady = true; armorTimer = 0; }
+            }
 
             // Пули игрока (если босс повержен — return)
             if (updatePlayerBullets(deltaTime, dt)) return;
@@ -1373,25 +1404,52 @@
             });
         }
 
+        // Пуля игрока с учётом апгрейда «пробой» (pierce)
+        function playerBullet(x, y, vx) {
+            return { x: x, y: y, width: bulletWidth, height: bulletHeight, vx: vx || 0, pierce: upgrades.pierce };
+        }
+
         // Выстрел игрока. При активном бонусе — три пули: прямо + две под углом
         function shootPlayerBullet() {
             if (!gameRunning || gameOver || paused || !player.width) return;
             const cx = player.x + player.width / 2 - bulletWidth / 2;
             const top = player.y - bulletHeight;
             if (bonuses.triple > 0) {
-                bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: 0 });
-                bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: -2.6 * unit });
-                bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: 2.6 * unit });
+                bullets.push(playerBullet(cx, top, 0));
+                bullets.push(playerBullet(cx, top, -2.6 * unit));
+                bullets.push(playerBullet(cx, top, 2.6 * unit));
             } else if (bonuses.double > 0) {
                 // две параллельные пули на ширине корабля (без угла)
-                const lx = player.x + player.width * 0.2 - bulletWidth / 2;
-                const rx = player.x + player.width * 0.8 - bulletWidth / 2;
-                bullets.push({ x: lx, y: top, width: bulletWidth, height: bulletHeight, vx: 0 });
-                bullets.push({ x: rx, y: top, width: bulletWidth, height: bulletHeight, vx: 0 });
+                bullets.push(playerBullet(player.x + player.width * 0.2 - bulletWidth / 2, top, 0));
+                bullets.push(playerBullet(player.x + player.width * 0.8 - bulletWidth / 2, top, 0));
             } else {
-                bullets.push({ x: cx, y: top, width: bulletWidth, height: bulletHeight, vx: 0 });
+                bullets.push(playerBullet(cx, top, 0));
+            }
+            // Крылья с пушками: пары параллельных пуль с краёв (по уровню)
+            for (let w = 1; w <= upgrades.wings; w++) {
+                const off = player.width * (0.42 + w * 0.26);
+                bullets.push(playerBullet(cx - off, top + bulletHeight * 0.4, 0));
+                bullets.push(playerBullet(cx + off, top + bulletHeight * 0.4, 0));
             }
             sndShoot();
+        }
+
+        // Дроны-спутники: держатся по бокам корабля и сами стреляют
+        function updateDrones(deltaTime) {
+            if (!drones.length || !player.width) return;
+            const t = performance.now();
+            for (const d of drones) {
+                const gap = player.width * (0.72 + d.slot * 0.55);
+                d.cx = player.x + player.width / 2 + d.side * gap;
+                d.cy = player.y + player.height * 0.25 + Math.sin(t / 280 + d.slot * 1.7) * player.height * 0.12;
+            }
+            droneFireTimer += deltaTime;
+            if (droneFireTimer >= 480) {
+                droneFireTimer = 0;
+                for (const d of drones) {
+                    bullets.push(playerBullet(d.cx - bulletWidth / 2, d.cy, 0));
+                }
+            }
         }
 
         // Фабрика пуль врагов (обычных и босса)
@@ -1459,9 +1517,34 @@
             updateScore();
             boss = null;                 // босс уничтожен
             enemyBullets = [];           // его пули убираем, чтобы не задели в паузе
+            grantBossUpgrade();          // развитие корабля: случайный апгрейд
             bossVictoryTimer = 1800;     // показываем «БОСС ПОВЕРЖЕН!» и держим паузу
             // продолжение игры (advanceStage) — по истечении таймера, см. loop()
         }
+
+        // Выдать случайный ещё не полученный апгрейд; когда все собраны —
+        // повышается уровень случайного (до UPGRADE_MAX).
+        function grantBossUpgrade() {
+            let pool = UPGRADE_KEYS.filter(k => upgrades[k] === 0);
+            if (!pool.length) pool = UPGRADE_KEYS.filter(k => upgrades[k] < UPGRADE_MAX);
+            if (!pool.length) { lastUpgradeText = ''; return; }
+            const key = pool[Math.floor(Math.random() * pool.length)];
+            upgrades[key]++;
+            if (key === 'drones') rebuildDrones();
+            if (key === 'armor') { armorReady = true; armorTimer = 0; }
+            lastUpgradeText = UPGRADE_NAMES[key] + (upgrades[key] > 1 ? ' ' + ROMAN[upgrades[key]] : '');
+            sndFanfare();
+        }
+
+        // Пересоздать дронов-спутников под текущий уровень
+        function rebuildDrones() {
+            drones = [];
+            for (let i = 0; i < upgrades.drones; i++) {
+                drones.push({ cx: 0, cy: 0, side: i % 2 === 0 ? -1 : 1, slot: Math.floor(i / 2) });
+            }
+        }
+        // Перезарядка брони зависит от уровня: ур.1 ~11с, ур.2 ~8с, ур.3 ~5с
+        function armorCooldown() { return Math.max(5000, 14000 - upgrades.armor * 3000); }
 
         // ===== Общие утилиты =====
 
@@ -1525,6 +1608,40 @@
         function drawShip(p) {
             const s = drawSprite(shipFrame, shipPalette, p.x, p.y, p.width, p.height, null);
 
+            // Крылья с пушками (апгрейд) — пиксельные «лопасти» по бокам корпуса
+            if (upgrades.wings > 0) {
+                ctx.save();
+                for (let w = 1; w <= upgrades.wings; w++) {
+                    const len = 1 + w;                 // длиннее с уровнем
+                    const rowTop = s.rows - 4;         // у «плеч» корабля
+                    for (let k = 0; k < len; k++) {
+                        const wy = s.oy + (rowTop + k) * s.cell;
+                        const lx = s.ox - (w + k) * s.cell;
+                        const rx = s.ox + (s.cols + (w - 1) + (len - 1 - k)) * s.cell;
+                        ctx.fillStyle = '#9aa0c8';
+                        ctx.fillRect(lx, wy, s.cell + 0.5, s.cell + 0.5);
+                        ctx.fillRect(rx, wy, s.cell + 0.5, s.cell + 0.5);
+                        // дульца пушек на концах
+                        if (k === 0) {
+                            ctx.fillStyle = '#ff9d00';
+                            ctx.fillRect(lx, wy - s.cell, s.cell + 0.5, s.cell + 0.5);
+                            ctx.fillRect(rx, wy - s.cell, s.cell + 0.5, s.cell + 0.5);
+                        }
+                    }
+                }
+                ctx.restore();
+            }
+
+            // Броня готова (апгрейд) — тонкая металлическая обводка корпуса
+            if (armorReady) {
+                ctx.save();
+                ctx.strokeStyle = '#c2c8e0';
+                ctx.globalAlpha = 0.55 + Math.sin(performance.now() / 220) * 0.15;
+                ctx.lineWidth = Math.max(1, s.cell * 0.4);
+                ctx.strokeRect(s.ox - s.cell * 0.5, s.oy + s.cell * 1.5, s.cols * s.cell + s.cell, (s.rows - 1) * s.cell);
+                ctx.restore();
+            }
+
             // Пламя из дюз — мигающие пиксельные блоки под двигателями
             ctx.save();
             ctx.shadowColor = '#ff9d00';
@@ -1540,6 +1657,25 @@
             ctx.restore();
 
             drawShipDamage(p, s);
+        }
+
+        // Дроны-спутники — маленькие пиксельные кораблики по бокам
+        function drawDrones() {
+            if (!drones.length) return;
+            const sz = Math.max(4, player.height * 0.34);
+            ctx.save();
+            ctx.shadowColor = '#2bd1ff';
+            ctx.shadowBlur = 4;
+            for (const d of drones) {
+                ctx.fillStyle = '#c2c8e0';
+                ctx.fillRect(d.cx - sz / 2, d.cy - sz / 2, sz, sz * 0.7);
+                ctx.fillStyle = '#1b9dff';
+                ctx.fillRect(d.cx - sz * 0.18, d.cy - sz * 0.18, sz * 0.36, sz * 0.36);
+                // мигающее дульце сверху
+                ctx.fillStyle = '#7cff6b';
+                ctx.fillRect(d.cx - sz * 0.1, d.cy - sz * 0.6, sz * 0.2, sz * 0.25);
+            }
+            ctx.restore();
         }
 
         // Повреждения корабля: чем меньше жизней, тем больше обугленных клеток.
@@ -1867,6 +2003,14 @@
             ctx.shadowColor = '#3aff7a';
             ctx.shadowBlur = TEXT_GLOW_LARGE;
             ctx.fillText('БОСС ПОВЕРЖЕН!', canvas.width / 2, canvas.height / 2);
+            // Полученный апгрейд
+            if (lastUpgradeText) {
+                const us = Math.round(canvas.width * 0.034);
+                ctx.font = `bold ${us}px ${FONT_FAMILY}`;
+                ctx.fillStyle = '#ffd166';
+                ctx.shadowColor = '#ff9d2e';
+                ctx.fillText('АПГРЕЙД: ' + lastUpgradeText, canvas.width / 2, canvas.height / 2 + size * 1.6);
+            }
             ctx.restore();
         }
 
@@ -1882,6 +2026,9 @@
 
             // Игрок
             if (player.width) drawShip(player);
+
+            // Дроны-спутники (апгрейд)
+            drawDrones();
 
             // Щит — пиксельный полукруг-«козырёк» над кораблём
             drawShield();
