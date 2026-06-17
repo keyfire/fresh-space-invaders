@@ -353,7 +353,7 @@
         let upgrades = { wings: 0, drones: 0, pierce: 0, armor: 0 };
         const UPGRADE_KEYS = ['wings', 'drones', 'pierce', 'armor'];
         const UPGRADE_MAX = 3;
-        const UPGRADE_NAMES = { wings: 'КРЫЛЬЯ', drones: 'ДРОНЫ', pierce: 'ПРОБОЙ', armor: 'БРОНЯ' };
+        const UPGRADE_NAMES = { wings: 'КРЫЛЬЯ', drones: 'ДРОНЫ', pierce: 'ПРОБОЙ', armor: 'МАГНИТ-ЩИТ' };
         const ROMAN = ['', 'I', 'II', 'III', 'IV'];
         let drones = [];            // спутники-дроны: {cx, cy, side, slot}
         let droneFireTimer = 0;
@@ -381,11 +381,11 @@
                 frame: ['....A....', '...AAA...', '..AAAAA..', 'XX.AAA.XX', '....A....', '....A....', '....A....', '....A....', '.........'],
                 palette: { 'A': '#eaffff', 'X': '#ff5e7e', '.': null }
             },
-            // броня — стальной щит-герб
+            // магнитный щит — фиолетовый щит-герб с бликами
             armor: {
-                glow: '#8fa0c8',
+                glow: '#b06bff',
                 frame: ['.XXXXXXX.', 'XXXXXXXXX', 'XLXXXXXLX', 'XXXXXXXXX', 'XXXXXXXXX', '.XXXXXXX.', '..XXXXX..', '...XXX...', '....X....'],
-                palette: { 'X': '#8fa0c8', 'L': '#d6e0ff', '.': null }
+                palette: { 'X': '#b06bff', 'L': '#e0c8ff', '.': null }
             }
         };
 
@@ -1354,11 +1354,12 @@
                         spawnExplosion(player.x + player.width / 2, player.y + player.height / 2, '#3fd8ff');
                         continue;
                     }
-                    // Броня (апгрейд): поглощает попадание и уходит на перезарядку
+                    // Магнитный щит (апгрейд): отражает выстрел вверх и уходит на перезарядку
                     if (armorReady) {
                         armorReady = false; armorTimer = 0;
-                        spawnExplosion(player.x + player.width / 2, player.y + player.height / 2, '#c2c8e0');
-                        sndHit();
+                        bullets.push(playerBullet(eb.x, player.y - bulletHeight, 0));
+                        spawnExplosion(eb.x, player.y, '#b06bff');
+                        sndShoot();
                         continue;
                     }
 
@@ -1638,7 +1639,8 @@
         function drawShip(p) {
             const s = drawSprite(shipFrame, shipPalette, p.x, p.y, p.width, p.height, null);
 
-            // Крылья с пушками (апгрейд) — пиксельные «лопасти» по бокам корпуса
+            // Крылья с пушками (апгрейд) — симметричные «лопасти» по бокам корпуса.
+            // Чем ниже ряд (больше k), тем дальше крыло уходит наружу — зеркально.
             if (upgrades.wings > 0) {
                 ctx.save();
                 for (let w = 1; w <= upgrades.wings; w++) {
@@ -1646,12 +1648,12 @@
                     const rowTop = s.rows - 4;         // у «плеч» корабля
                     for (let k = 0; k < len; k++) {
                         const wy = s.oy + (rowTop + k) * s.cell;
-                        const lx = s.ox - (w + k) * s.cell;
-                        const rx = s.ox + (s.cols + (w - 1) + (len - 1 - k)) * s.cell;
+                        const lx = s.ox - (w + k) * s.cell;                    // влево-наружу
+                        const rx = s.ox + (s.cols - 1 + w + k) * s.cell;       // вправо-наружу (зеркало)
                         ctx.fillStyle = '#9aa0c8';
                         ctx.fillRect(lx, wy, s.cell + 0.5, s.cell + 0.5);
                         ctx.fillRect(rx, wy, s.cell + 0.5, s.cell + 0.5);
-                        // дульца пушек на концах
+                        // дульца пушек на верхних концах крыльев
                         if (k === 0) {
                             ctx.fillStyle = '#ff9d00';
                             ctx.fillRect(lx, wy - s.cell, s.cell + 0.5, s.cell + 0.5);
@@ -1659,16 +1661,6 @@
                         }
                     }
                 }
-                ctx.restore();
-            }
-
-            // Броня готова (апгрейд) — тонкая металлическая обводка корпуса
-            if (armorReady) {
-                ctx.save();
-                ctx.strokeStyle = '#c2c8e0';
-                ctx.globalAlpha = 0.55 + Math.sin(performance.now() / 220) * 0.15;
-                ctx.lineWidth = Math.max(1, s.cell * 0.4);
-                ctx.strokeRect(s.ox - s.cell * 0.5, s.oy + s.cell * 1.5, s.cols * s.cell + s.cell, (s.rows - 1) * s.cell);
                 ctx.restore();
             }
 
@@ -1925,6 +1917,34 @@
             ctx.restore();
         }
 
+        // Магнитный щит (апгрейд «armor») — пульсирующее пиксельное кольцо вокруг
+        // корабля; пока заряжен, отражает вражеский выстрел вверх.
+        function drawMagnetShield() {
+            if (!armorReady || !player.width) return;
+            const cell = Math.max(2, Math.min(player.width / 13, player.height / 10));
+            const cx = player.x + player.width / 2;
+            const cy = player.y + player.height * 0.5;
+            const R = player.width * 0.72;
+            const pulse = 0.5 + Math.sin(performance.now() / 120) * 0.25;
+            const steps = Math.max(16, Math.round(2 * Math.PI * R / cell));
+            ctx.save();
+            ctx.shadowColor = '#b06bff';
+            ctx.shadowBlur = 8;
+            const seen = new Set();
+            for (let s = 0; s <= steps; s++) {
+                const a = 2 * Math.PI * (s / steps);
+                const bx = Math.round((cx + Math.cos(a) * R) / cell) * cell;
+                const by = Math.round((cy + Math.sin(a) * R) / cell) * cell;
+                const key = bx + ',' + by;
+                if (seen.has(key)) continue;
+                seen.add(key);
+                ctx.globalAlpha = pulse;
+                ctx.fillStyle = (s % 2 === 0) ? '#d6b3ff' : '#b06bff';
+                ctx.fillRect(bx, by, cell + 0.5, cell + 0.5);
+            }
+            ctx.restore();
+        }
+
         // Морозный налёт при заморозке жуков
         function drawFreezeOverlay() {
             if (bonuses.freeze <= 0) return;
@@ -2071,6 +2091,8 @@
 
             // Щит — пиксельный полукруг-«козырёк» над кораблём
             drawShield();
+            // Магнитный щит (апгрейд) — кольцо вокруг корабля
+            drawMagnetShield();
 
             // Враги: босс или обычный строй
             if (isBoss) {
