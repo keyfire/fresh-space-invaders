@@ -990,8 +990,12 @@
             const formationW = enemyCols * enemyWidth + (enemyCols - 1) * enemySpacing;
             const startX = (canvas.width - formationW) / 2;
             const startY = Math.round(canvas.height * 0.06) + safeAreaTop;
+            // Бронирование: с ростом уровня жукам нужно больше попаданий.
+            // Верхние ряды чуть прочнее нижних — строй не однородная «стена».
+            const baseHp = Math.min(6, 1 + Math.floor((level - 1) / 4));
             enemies = [];
             for (let row = 0; row < enemyRows; row++) {
+                const rowHp = baseHp + (level >= 8 && row < 2 ? 1 : 0);
                 for (let col = 0; col < enemyCols; col++) {
                     enemies.push({
                         x: startX + col * (enemyWidth + enemySpacing),
@@ -999,7 +1003,9 @@
                         width: enemyWidth,
                         height: enemyHeight,
                         alive: true,
-                        row: row
+                        row: row,
+                        hp: rowHp,
+                        maxHp: rowHp
                     });
                 }
             }
@@ -1226,24 +1232,32 @@
 
                 // Проверка столкновения с врагами
                 for (let j = 0; j < enemies.length; j++) {
-                    if (enemies[j].alive && rectsOverlap(
+                    const en = enemies[j];
+                    if (en.alive && rectsOverlap(
                         {x: b.x, y: b.y, w: bulletWidth, h: bulletHeight},
-                        {x: enemies[j].x, y: enemies[j].y, w: enemies[j].width, h: enemies[j].height}
+                        {x: en.x, y: en.y, w: en.width, h: en.height}
                     )) {
-                        enemies[j].alive = false;
-                        const cx = enemies[j].x + enemies[j].width / 2;
-                        const cy = enemies[j].y + enemies[j].height / 2;
-                        spawnExplosion(cx, cy, bugColors[enemies[j].row % bugColors.length]);
-                        if (lives < 3 && Math.random() < POWERUP_DROP_CHANCE / 3) {
-                            spawnPowerup(cx, cy, 'heart');
-                        } else if (Math.random() < POWERUP_DROP_CHANCE) {
-                            spawnPowerup(cx, cy);
+                        en.hp--;
+                        const cx = en.x + en.width / 2;
+                        const cy = en.y + en.height / 2;
+                        if (en.hp <= 0) {
+                            en.alive = false;
+                            spawnExplosion(cx, cy, bugColors[en.row % bugColors.length]);
+                            if (lives < 3 && Math.random() < POWERUP_DROP_CHANCE / 3) {
+                                spawnPowerup(cx, cy, 'heart');
+                            } else if (Math.random() < POWERUP_DROP_CHANCE) {
+                                spawnPowerup(cx, cy);
+                            }
+                            sndExplosion();
+                            score += 10;
+                            updateScore();
+                        } else {
+                            // повреждён, но жив — искра без звука взрыва
+                            spawnExplosion(b.x, b.y, '#ffffff');
                         }
-                        sndExplosion();
-                        score += 10;
-                        updateScore();
-                        // Пробивные пули летят дальше сквозь строй
-                        if (b.pierce > 0) { b.pierce--; }
+                        // Пробивные пули летят дальше: телепортируем над жуком,
+                        // чтобы не бить того же на следующем кадре
+                        if (b.pierce > 0) { b.pierce--; b.y = en.y - bulletHeight - 1; }
                         else { bullets.splice(i, 1); }
                         break;
                     }
@@ -1750,7 +1764,11 @@
         function drawBug(e) {
             const frames = bugForms[currentFormIndex()];
             const frame = frames[Math.floor(performance.now() / 450) % frames.length];
-            const base = bugColors[e.row % bugColors.length];
+            let base = bugColors[e.row % bugColors.length];
+            // Бронированный жук темнеет по мере урона (видно, что «потрёпан»)
+            if (e.maxHp > 1 && e.hp < e.maxHp) {
+                base = shade(base, 0.45 + 0.55 * (e.hp / e.maxHp));
+            }
             const palette = {
                 'X': base,
                 'D': shade(base, 0.55),   // тень
