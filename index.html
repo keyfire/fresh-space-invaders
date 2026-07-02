@@ -355,8 +355,8 @@
         // Вне Telegram tg.platform === 'unknown' — все фичи тихо выключены.
         const tg = window.Telegram && window.Telegram.WebApp;
         const isTelegram = !!(tg && tg.platform && tg.platform !== 'unknown');
-        // Ссылка для «Поделиться»: после создания бота заменить на t.me/<bot>/<app>
-        const SHARE_URL = 'https://keyfire.github.io/fresh-space-invaders/';
+        // Ссылка для «Поделиться» — открывает Mini App в Telegram
+        const SHARE_URL = 'https://t.me/kosmozhuki_bot/play';
         // Adsgram: вписать blockId из кабинета (и раскомментировать SDK в <head>)
         const ADSGRAM_BLOCK_ID = '';
         if (isTelegram) {
