@@ -12,6 +12,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="КосмоЖуки">
+    <!-- Telegram Mini App SDK: вне Telegram скрипт безвреден (isTelegram=false) -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Adsgram SDK (rewarded-реклама в Telegram) — раскомментировать при подключении:
+    <script src="https://sad.adsgram.ai/js/sad.min.js"></script> -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -275,6 +279,11 @@
             background: linear-gradient(180deg, #7cf6ff, #2bd1ff);
             box-shadow: 0 0 14px rgba(43, 209, 255, 0.5);
         }
+        /* Поделиться результатом (Telegram / системный share) */
+        .share-btn {
+            background: linear-gradient(180deg, #6cc9ff, #2aabee);
+            box-shadow: 0 0 14px rgba(42, 171, 238, 0.5);
+        }
 
         /* Оверлей-заглушка rewarded-рекламы (заменяется реальным SDK) */
         .ad-overlay {
@@ -316,6 +325,7 @@
                 <button class="ad-btn" id="reviveBtn">ПРОДОЛЖИТЬ<span class="adtag">[ РЕКЛАМА ]</span></button>
                 <button class="ad-btn" id="doubleBtn">×2 ОЧКИ<span class="adtag">[ РЕКЛАМА ]</span></button>
                 <button class="restart-btn" id="restartButton">ЗАНОВО</button>
+                <button class="share-btn" id="shareBtn">ПОДЕЛИТЬСЯ</button>
             </div>
         </div>
     </div>
@@ -335,10 +345,28 @@
         const reviveBtn = document.getElementById('reviveBtn');
         const doubleBtn = document.getElementById('doubleBtn');
         const restartButton = document.getElementById('restartButton');
+        const shareBtn = document.getElementById('shareBtn');
 
         // Сенсорное устройство — показываем тач-контролы и приподнимаем корабль над ними
         const isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
         const FONT_FAMILY = "'Press Start 2P', monospace";
+
+        // ===== Telegram Mini App =====
+        // Вне Telegram tg.platform === 'unknown' — все фичи тихо выключены.
+        const tg = window.Telegram && window.Telegram.WebApp;
+        const isTelegram = !!(tg && tg.platform && tg.platform !== 'unknown');
+        // Ссылка для «Поделиться»: после создания бота заменить на t.me/<bot>/<app>
+        const SHARE_URL = 'https://keyfire.github.io/fresh-space-invaders/';
+        // Adsgram: вписать blockId из кабинета (и раскомментировать SDK в <head>)
+        const ADSGRAM_BLOCK_ID = '';
+        if (isTelegram) {
+            tg.ready();
+            tg.expand();                                   // на весь экран
+            if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();  // свайп по треку не сворачивает игру
+            if (tg.setHeaderColor) tg.setHeaderColor('#05050f');
+            if (tg.setBackgroundColor) tg.setBackgroundColor('#05050f');
+            tg.onEvent('viewportChanged', function() { fitCanvas(); });
+        }
         // Safe-area inset для «чёлки» — читаем из :root (--sat: env(...))
         let safeAreaTop = 0;
         let hudBottom = 0;   // низ HUD в координатах canvas (только touch)
@@ -366,6 +394,12 @@
         // Переключение состояния интерфейса: menu | playing | over
         function setUIState(state) {
             document.body.className = 'state-' + state;
+            // В Telegram: во время игры просим подтверждение закрытия,
+            // чтобы случайный жест не убил забег
+            if (isTelegram && tg.enableClosingConfirmation) {
+                if (state === 'playing') tg.enableClosingConfirmation();
+                else tg.disableClosingConfirmation();
+            }
         }
 
 
@@ -523,6 +557,27 @@
         function saveBest() {
             setCookie('ksi_best_score', bestScore, 3650);
             setCookie('ksi_best_level', bestLevel, 3650);
+            // В Telegram рекорд дублируется в CloudStorage (живёт в аккаунте,
+            // синхронизируется между устройствами)
+            if (isTelegram && tg.CloudStorage) {
+                tg.CloudStorage.setItem('ksi_best_score', String(bestScore), function() {});
+                tg.CloudStorage.setItem('ksi_best_level', String(bestLevel), function() {});
+            }
+        }
+        // Подтянуть рекорд из Telegram CloudStorage (асинхронно, после loadBest)
+        function loadBestFromCloud() {
+            if (!isTelegram || !tg.CloudStorage) return;
+            tg.CloudStorage.getItems(['ksi_best_score', 'ksi_best_level'], function(err, vals) {
+                if (err || !vals) return;
+                const cs = parseInt(vals.ksi_best_score, 10) || 0;
+                const cl = parseInt(vals.ksi_best_level, 10) || 0;
+                if (cs > bestScore || cl > bestLevel) {
+                    bestScore = Math.max(bestScore, cs);
+                    bestLevel = Math.max(bestLevel, cl);
+                    hadRecord = bestScore > 0 || bestLevel > 0;
+                    saveBest();   // синхронизируем куки с облаком
+                }
+            });
         }
         // Проверка/обновление рекорда; салют — при превышении уже существующего рекорда
         function checkRecord() {
@@ -2234,10 +2289,18 @@
         // чтобы подключить реальную сеть, замените тело showRewarded на вызов
         // её SDK: показать rewarded-ролик и вызвать onReward при досмотре,
         // onSkip — при закрытии без награды.
+        let adsgramController = null;
         const Ads = {
             showRewarded(onReward, onSkip) {
-                // TODO: заменить на реальный SDK, напр.:
-                //   sdk.showRewarded().then(r => r.rewarded ? onReward() : onSkip && onSkip());
+                // Adsgram (rewarded в Telegram): нужен ADSGRAM_BLOCK_ID + SDK в <head>
+                if (isTelegram && ADSGRAM_BLOCK_ID && window.Adsgram) {
+                    if (!adsgramController) adsgramController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
+                    adsgramController.show()
+                        .then(function() { onReward(); })
+                        .catch(function() { if (onSkip) onSkip(); });
+                    return;
+                }
+                // Тест-заглушка (веб-версия / сеть ещё не подключена)
                 playAdStub(onReward);
             }
         };
@@ -2264,6 +2327,18 @@
         function refreshOverButtons() {
             reviveBtn.style.display = usedRevive < MAX_REVIVES ? 'block' : 'none';
             doubleBtn.style.display = (!usedDouble && score > 0) ? 'block' : 'none';
+            shareBtn.style.display = (isTelegram || navigator.share) ? 'block' : 'none';
+        }
+
+        // Поделиться результатом: в Telegram — шаринг в чаты, иначе — системный share
+        function shareScore() {
+            const text = 'Я набрал ' + score + ' очков в «КосмоЖуках»! Попробуй побить 👾';
+            if (isTelegram) {
+                tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(SHARE_URL) +
+                                    '&text=' + encodeURIComponent(text));
+            } else if (navigator.share) {
+                navigator.share({ text: text, url: SHARE_URL }).catch(function() {});
+            }
         }
 
         // Продолжить после гибели (за рекламу): вернуть жизни и отодвинуть строй
@@ -2448,6 +2523,7 @@
             initAudio();
             Ads.showRewarded(doubleScore);
         });
+        shareBtn.addEventListener('click', shareScore);
 
         // Перестройка холста при изменении размера/повороте экрана
         window.addEventListener('resize', fitCanvas);
@@ -2455,6 +2531,7 @@
 
         // Запуск единого цикла анимации
         loadBest();
+        loadBestFromCloud();
         setUIState('menu');
         fitCanvas();
         lastTime = performance.now();
