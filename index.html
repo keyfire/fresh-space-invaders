@@ -229,10 +229,72 @@
             box-shadow: 0 0 16px rgba(43, 209, 255, 0.6);
             transition: transform 0.08s ease, box-shadow 0.2s ease;
         }
-        body.state-menu .center-btn,
-        body.state-over .center-btn { display: block; }
+        body.state-menu .center-btn { display: block; }
         .center-btn:hover { box-shadow: 0 0 26px rgba(43, 209, 255, 0.9); }
         .center-btn:active { transform: translate(-50%, -50%) translateY(1px); }
+
+        /* Экран проигрыша — колонка кнопок (продолжить/×2/заново) */
+        .over-actions {
+            display: none;
+            position: absolute;
+            z-index: 6;
+            top: 54%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            flex-direction: column;
+            align-items: center;
+            gap: 9px;
+            width: max-content;
+        }
+        body.state-over .over-actions { display: flex; }
+        .over-actions button {
+            font-family: inherit;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            color: #05050f;
+            padding: 11px 16px;
+            font-size: clamp(9px, 2.4vw, 12px);
+            line-height: 1.5;
+            white-space: nowrap;
+            transition: transform 0.08s ease, box-shadow 0.2s ease;
+        }
+        .over-actions button:active { transform: translateY(1px); }
+        /* Кнопки за рекламу — зелёные, со «значком» рекламы */
+        .ad-btn {
+            background: linear-gradient(180deg, #9dff5a, #4fce2a);
+            box-shadow: 0 0 14px rgba(120, 255, 90, 0.5);
+        }
+        .ad-btn .adtag {
+            display: block;
+            font-size: 0.72em;
+            color: #16300a;
+            opacity: 0.85;
+        }
+        .restart-btn {
+            background: linear-gradient(180deg, #7cf6ff, #2bd1ff);
+            box-shadow: 0 0 14px rgba(43, 209, 255, 0.5);
+        }
+
+        /* Оверлей-заглушка rewarded-рекламы (заменяется реальным SDK) */
+        .ad-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            background: rgba(3, 3, 10, 0.92);
+            color: #e8e8ff;
+            font-family: inherit;
+            text-align: center;
+            padding: 20px;
+        }
+        .ad-overlay .adlabel { font-size: clamp(10px, 3vw, 15px); color: #9dff5a; }
+        .ad-overlay .adcount { font-size: clamp(22px, 8vw, 44px); color: #ffd166; }
+        .ad-overlay .adhint { font-size: clamp(8px, 2.4vw, 11px); color: #6a7090; }
     </style>
 </head>
 <body>
@@ -250,6 +312,11 @@
                 <button class="ctrl fire-btn" id="fireButton" aria-label="Выстрел">ОГОНЬ</button>
             </div>
             <button class="center-btn" id="startButton">Начать игру</button>
+            <div class="over-actions" id="overActions">
+                <button class="ad-btn" id="reviveBtn">ПРОДОЛЖИТЬ<span class="adtag">[ РЕКЛАМА ]</span></button>
+                <button class="ad-btn" id="doubleBtn">×2 ОЧКИ<span class="adtag">[ РЕКЛАМА ]</span></button>
+                <button class="restart-btn" id="restartButton">ЗАНОВО</button>
+            </div>
         </div>
     </div>
 
@@ -265,6 +332,9 @@
         const fireButton = document.getElementById('fireButton');
         const stageElement = document.querySelector('.stage');
         const hudElement = document.querySelector('.hud');
+        const reviveBtn = document.getElementById('reviveBtn');
+        const doubleBtn = document.getElementById('doubleBtn');
+        const restartButton = document.getElementById('restartButton');
 
         // Сенсорное устройство — показываем тач-контролы и приподнимаем корабль над ними
         const isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
@@ -342,6 +412,11 @@
         let isBoss = false;
         let boss = null;
         let bossVictoryTimer = 0;   // мс показа «БОСС ПОВЕРЖЕН!» перед продолжением
+
+        // Монетизация: rewarded-реклама (продолжить/удвоить очки за просмотр)
+        let usedRevive = 0;         // сколько раз возрождались в этой игре
+        let usedDouble = false;     // удвоение очков уже использовано
+        const MAX_REVIVES = 2;      // лимит возрождений по рекламе за игру
         // Текущая форма пришельцев — меняется каждые 5 раундов циклично
         function currentFormIndex() {
             return Math.floor((level - 1) / 5) % bugForms.length;
@@ -1102,6 +1177,7 @@
             // сброс апгрейдов
             upgrades.wings = upgrades.drones = upgrades.pierce = upgrades.armor = 0;
             drones = []; droneFireTimer = 0; armorReady = false; armorTimer = 0; lastUpgradeText = ''; lastUpgradeKey = '';
+            usedRevive = 0; usedDouble = false;   // сброс монетизации на новую игру
             paused = false;
             // Новая игра — салют можно показать снова; рекорд берём актуальный
             recordCelebrated = false;
@@ -2153,12 +2229,82 @@
             drawBossVictory();
         }
 
+        // ===== Rewarded-реклама (монетизация) =====
+        // Единая точка подключения рекламной сети. Сейчас — тест-заглушка;
+        // чтобы подключить реальную сеть, замените тело showRewarded на вызов
+        // её SDK: показать rewarded-ролик и вызвать onReward при досмотре,
+        // onSkip — при закрытии без награды.
+        const Ads = {
+            showRewarded(onReward, onSkip) {
+                // TODO: заменить на реальный SDK, напр.:
+                //   sdk.showRewarded().then(r => r.rewarded ? onReward() : onSkip && onSkip());
+                playAdStub(onReward);
+            }
+        };
+        // Оверлей, имитирующий просмотр rewarded-рекламы (3 сек обратного отсчёта)
+        function playAdStub(done) {
+            const ov = document.createElement('div');
+            ov.className = 'ad-overlay';
+            ov.innerHTML = '<div class="adlabel">РЕКЛАМА (тест)</div>' +
+                           '<div class="adcount">3</div>' +
+                           '<div class="adhint">здесь будет rewarded-ролик</div>';
+            document.body.appendChild(ov);
+            const countEl = ov.querySelector('.adcount');
+            let n = 3;
+            const tick = setInterval(() => {
+                n--;
+                if (n > 0) { countEl.textContent = n; return; }
+                clearInterval(tick);
+                ov.remove();
+                if (done) done();
+            }, 1000);
+        }
+
+        // Показать/скрыть кнопки за рекламу по доступности
+        function refreshOverButtons() {
+            reviveBtn.style.display = usedRevive < MAX_REVIVES ? 'block' : 'none';
+            doubleBtn.style.display = (!usedDouble && score > 0) ? 'block' : 'none';
+        }
+
+        // Продолжить после гибели (за рекламу): вернуть жизни и отодвинуть строй
+        function revivePlayer() {
+            usedRevive++;
+            lives = 3;
+            bullets = [];
+            enemyBullets = [];
+            // Отодвигаем строй вверх, если жуки у самого игрока
+            if (!isBoss) {
+                let lowest = 0;
+                for (const e of enemies) if (e.alive) lowest = Math.max(lowest, e.y + e.height);
+                const safeY = player.y - player.height * 3;
+                if (lowest > safeY) {
+                    const shift = lowest - safeY;
+                    for (const e of enemies) if (e.alive) e.y -= shift;
+                }
+            }
+            createPlayer();
+            gameOver = false;
+            gameRunning = true;
+            paused = false;
+            updateScore();
+            setUIState('playing');
+        }
+
+        // Удвоить очки за рекламу (после игры)
+        function doubleScore() {
+            usedDouble = true;
+            score *= 2;
+            spawnFloatText(canvas.width / 2, canvas.height * 0.5, '×2 ОЧКИ!', '#9dff5a');
+            updateScore();          // обновит и рекорд (checkRecord)
+            refreshOverButtons();
+        }
+
         // Конец игры
         function showGameOver() {
             gameRunning = false;
             paused = false;
             stopFire();
-            startButton.textContent = 'Играть заново';
+            refreshOverButtons();
             setUIState('over');
         }
 
@@ -2287,6 +2433,20 @@
         startButton.addEventListener('click', function() {
             initAudio();
             startGame();
+        });
+        restartButton.addEventListener('click', function() {
+            initAudio();
+            startGame();
+        });
+        // Продолжить за рекламу
+        reviveBtn.addEventListener('click', function() {
+            initAudio();
+            Ads.showRewarded(revivePlayer);
+        });
+        // Удвоить очки за рекламу
+        doubleBtn.addEventListener('click', function() {
+            initAudio();
+            Ads.showRewarded(doubleScore);
         });
 
         // Перестройка холста при изменении размера/повороте экрана
