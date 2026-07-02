@@ -20,7 +20,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
-        :root { --sat: env(safe-area-inset-top, 0px); }
+        :root {
+            --sat: env(safe-area-inset-top, 0px);
+            --sab-env: env(safe-area-inset-bottom, 0px);
+            --sab: var(--sab-env);   /* нижний inset; JS поднимает его под блок Telegram */
+        }
         html, body {
             height: 100%;
             overflow: hidden;
@@ -187,7 +191,7 @@
         }
         .move-pad {
             left: 10px;
-            bottom: 8px;
+            bottom: calc(8px + var(--sab, 0px));
             width: 80%;
             max-width: calc(100% - 115px);   /* оставляем место под кнопку «Огонь» */
             height: 58px;
@@ -197,7 +201,7 @@
         }
         .fire-btn {
             right: 14px;
-            bottom: 4px;
+            bottom: calc(4px + var(--sab, 0px));
             width: 74px;
             height: 70px;
             font-size: 10px;
@@ -366,9 +370,12 @@
             if (tg.setHeaderColor) tg.setHeaderColor('#05050f');
             if (tg.setBackgroundColor) tg.setBackgroundColor('#05050f');
             tg.onEvent('viewportChanged', function() { fitCanvas(); });
+            tg.onEvent('safeAreaChanged', function() { fitCanvas(); });
+            tg.onEvent('contentSafeAreaChanged', function() { fitCanvas(); });
         }
         // Safe-area inset для «чёлки» — читаем из :root (--sat: env(...))
         let safeAreaTop = 0;
+        let safeAreaBottomCss = 0;   // нижний inset в CSS px (env + блок Telegram)
         let hudBottom = 0;   // низ HUD в координатах canvas (только touch)
         function readSafeArea(dpr) {
             // env() гарантированно резолвится в custom property, читаем через CSSOM
@@ -384,6 +391,18 @@
                 document.body.removeChild(el);
             }
             safeAreaTop = Math.round(val * dpr);
+
+            // Нижний inset: env() (через --sab-env) и данные Telegram —
+            // высота нижнего блока/индикатора. Берём максимум и кладём в --sab,
+            // на него подняты трек движения и кнопка «Огонь».
+            let bottom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sab-env')) || 0;
+            if (isTelegram) {
+                const sa = tg.safeAreaInset || {};
+                const csa = tg.contentSafeAreaInset || {};
+                bottom = Math.max(bottom, (sa.bottom || 0) + (csa.bottom || 0));
+            }
+            safeAreaBottomCss = Math.round(bottom);
+            document.documentElement.style.setProperty('--sab', safeAreaBottomCss + 'px');
         }
         // Уровни свечения текста (ctx.shadowBlur) — уменьшены вдвое
         const TEXT_GLOW_SMALL = 2;    // метки бонусов и HUD
@@ -409,7 +428,8 @@
             const base = Math.round(canvas.height * 0.02);
             if (!isTouch) return base;
             const sclY = canvas.height / (parseFloat(canvas.style.height) || canvas.height);
-            return base + Math.round(96 * sclY);   // ~96px CSS под контролы + safe-area
+            // ~96px CSS под контролы + нижний inset (env/блок Telegram)
+            return base + Math.round((96 + safeAreaBottomCss) * sclY);
         }
 
         // Игровые параметры — пересчитываются под размер холста (см. computeLayout)
