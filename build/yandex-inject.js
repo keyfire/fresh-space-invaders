@@ -27,6 +27,15 @@
         YaGames.init().then(function (sdk) {
             ysdk = sdk;
             window.ysdk = sdk;
+            // Язык из окружения Яндекса — чтобы игра переключалась вместе с интерфейсом
+            // Яндекса (модерация проверяет каждый заявленный язык через SDK).
+            try {
+                var yl = sdk.environment && sdk.environment.i18n && sdk.environment.i18n.lang;
+                if (yl) {
+                    yl = String(yl).toLowerCase().split('-')[0];
+                    if (SUPPORTED_LANGS.indexOf(yl) >= 0 && yl !== LANG) { LANG = yl; applyI18n(); }
+                }
+            } catch (e) {}
             // Обязательно: сообщаем платформе, что игра загрузилась и готова к игре.
             try { if (sdk.features && sdk.features.LoadingAPI) sdk.features.LoadingAPI.ready(); } catch (e) {}
 
