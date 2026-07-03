@@ -15,3 +15,7 @@ desktop.ini
 # Logs / temp
 *.log
 tmp/
+
+# Сборка под Яндекс Игры (артефакты; исходники сборки — в build/)
+yandex-build/
+*.zip
