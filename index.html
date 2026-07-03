@@ -2534,14 +2534,18 @@
             startGame();
         });
         // Продолжить за рекламу
+        // Сообщение, если реклама не показалась (нет заполнения/модерация/ошибка)
+        function adUnavailable() {
+            spawnFloatText(canvas.width / 2, canvas.height * 0.5, 'РЕКЛАМА НЕДОСТУПНА', '#ff7c9c');
+        }
         reviveBtn.addEventListener('click', function() {
             initAudio();
-            Ads.showRewarded(revivePlayer);
+            Ads.showRewarded(revivePlayer, adUnavailable);
         });
         // Удвоить очки за рекламу
         doubleBtn.addEventListener('click', function() {
             initAudio();
-            Ads.showRewarded(doubleScore);
+            Ads.showRewarded(doubleScore, adUnavailable);
         });
         shareBtn.addEventListener('click', shareScore);
 
