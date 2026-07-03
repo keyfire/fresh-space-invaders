@@ -366,7 +366,7 @@
 
         // ===== Локализация (i18n) — язык по локали пользователя =====
         // Поддержка RU/EN/ES/PT (языки каталога FindMini). Прочие локали → EN.
-        const SUPPORTED_LANGS = ['ru', 'en', 'es', 'pt'];
+        const SUPPORTED_LANGS = ['ru', 'en', 'es', 'pt', 'tr'];
         function detectLang() {
             let code = '';
             try {
@@ -444,6 +444,22 @@
                 adtag: '[ ANUNCIO ]', aria_pause: 'Pausa', aria_fire: 'Disparar',
                 ad_test: 'ANUNCIO (teste)', ad_hint: 'aqui vai o vídeo premiado',
                 share: (s) => `Fiz ${s} pontos em Cosmic Bugs! Tente superar 👾`
+            },
+            tr: {
+                doc_title: 'Uzay Böcekleri', title: 'UZAY BOCEKLERI',
+                recordLine: (s, l) => `Rekor: ${s} · seviye ${l}`,
+                pause: 'DURAKLAT', pauseHint: 'YUKARI VEYA ESC', gameOver: 'OYUN BITTI',
+                yourScore: (s) => `Skorun: ${s}`,
+                newRecord: 'YENI REKOR!', bossDefeated: 'BOSS YENILDI!',
+                upgradeLabel: 'YUKSELTME: ', boss: 'BOSS',
+                buff_triple: 'UCLU ATIS', buff_shield: 'KALKAN', buff_freeze: 'DONDUR', buff_rapid: 'SERI ATIS', buff_double: 'IKILI ATIS',
+                upg_wings: 'KANATLAR', upg_drones: 'DRONLAR', upg_pierce: 'DELICI', upg_armor: 'MIKNATIS KALKAN',
+                plusLife: '+1 CAN', adUnavailable: 'REKLAM YOK', doubled: '×2 PUAN!',
+                hud_score: 'Skor:', hud_lives: 'Can:', hud_level: 'Seviye:',
+                btn_start: 'Oyna', btn_fire: 'ATES', btn_continue: 'DEVAM ET', btn_double: '×2 PUAN', btn_restart: 'YENIDEN', btn_share: 'PAYLAS',
+                adtag: '[ REKLAM ]', aria_pause: 'Duraklat', aria_fire: 'Ateş',
+                ad_test: 'REKLAM (test)', ad_hint: 'ödüllü video burada olacak',
+                share: (s) => `Uzay Böcekleri'nde ${s} puan yaptım! Geçmeyi dene 👾`
             }
         };
         function t(key) {
