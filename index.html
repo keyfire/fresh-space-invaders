@@ -314,7 +314,7 @@
     <div class="game-container">
         <div class="stage">
             <div class="game-area">
-                <div class="hud">Счёт: <span id="score">0</span><span class="sep">·</span>Жизни: <span id="lives" class="lives">3</span><span class="sep">·</span>Уровень: <span id="level" class="level">1</span></div>
+                <div class="hud"><span id="lblScore">Счёт:</span> <span id="score">0</span><span class="sep">·</span><span id="lblLives">Жизни:</span> <span id="lives" class="lives">3</span><span class="sep">·</span><span id="lblLevel">Уровень:</span> <span id="level" class="level">1</span></div>
                 <div class="canvas-wrap">
                     <canvas id="gameCanvas" width="800" height="600"></canvas>
                     <button class="ctrl pause-btn" id="pauseButton" aria-label="Пауза"></button>
@@ -363,6 +363,112 @@
         const SHARE_URL = 'https://t.me/kosmozhuki_bot/play';
         // Adsgram: вписать blockId из кабинета (и раскомментировать SDK в <head>)
         const ADSGRAM_BLOCK_ID = '37189';
+
+        // ===== Локализация (i18n) — язык по локали пользователя =====
+        // Поддержка RU/EN/ES/PT (языки каталога FindMini). Прочие локали → EN.
+        const SUPPORTED_LANGS = ['ru', 'en', 'es', 'pt'];
+        function detectLang() {
+            let code = '';
+            try {
+                if (isTelegram && tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.language_code) {
+                    code = tg.initDataUnsafe.user.language_code;   // напр. 'ru', 'en', 'pt-br'
+                } else {
+                    code = navigator.language || navigator.userLanguage || 'en';
+                }
+            } catch (e) { code = 'en'; }
+            code = (code || 'en').toLowerCase().split('-')[0];
+            return SUPPORTED_LANGS.indexOf(code) >= 0 ? code : 'en';
+        }
+        let LANG = detectLang();
+        const I18N = {
+            ru: {
+                doc_title: 'Космические жуки', title: 'КОСМИЧЕСКИЕ ЖУКИ',
+                recordLine: (s, l) => `Рекорд: ${s} · уровень ${l}`,
+                pause: 'ПАУЗА', pauseHint: 'СВЕРХУ ИЛИ ESC', gameOver: 'ИГРА ОКОНЧЕНА',
+                yourScore: (s) => `Ваш счёт: ${s}`,
+                newRecord: 'НОВЫЙ РЕКОРД!', bossDefeated: 'БОСС ПОВЕРЖЕН!',
+                upgradeLabel: 'АПГРЕЙД: ', boss: 'БОСС',
+                buff_triple: 'ТРОЙНОЙ ВЫСТРЕЛ', buff_shield: 'ЩИТ', buff_freeze: 'ЗАМОРОЗКА', buff_rapid: 'ОЧЕРЕДЬ', buff_double: 'ДВОЙНОЙ',
+                upg_wings: 'КРЫЛЬЯ', upg_drones: 'ДРОНЫ', upg_pierce: 'ПРОБОЙ', upg_armor: 'МАГНИТ-ЩИТ',
+                plusLife: '+1 ЖИЗНЬ', adUnavailable: 'РЕКЛАМА НЕДОСТУПНА', doubled: '×2 ОЧКИ!',
+                hud_score: 'Счёт:', hud_lives: 'Жизни:', hud_level: 'Уровень:',
+                btn_start: 'Начать игру', btn_fire: 'ОГОНЬ', btn_continue: 'ПРОДОЛЖИТЬ', btn_double: '×2 ОЧКИ', btn_restart: 'ЗАНОВО', btn_share: 'ПОДЕЛИТЬСЯ',
+                adtag: '[ РЕКЛАМА ]', aria_pause: 'Пауза', aria_fire: 'Выстрел',
+                ad_test: 'РЕКЛАМА (тест)', ad_hint: 'здесь будет rewarded-ролик',
+                share: (s) => `Я набрал ${s} очков в «Космических жуках»! Попробуй побить 👾`
+            },
+            en: {
+                doc_title: 'Cosmic Bugs', title: 'COSMIC BUGS',
+                recordLine: (s, l) => `Best: ${s} · level ${l}`,
+                pause: 'PAUSE', pauseHint: 'TAP TOP OR ESC', gameOver: 'GAME OVER',
+                yourScore: (s) => `Your score: ${s}`,
+                newRecord: 'NEW RECORD!', bossDefeated: 'BOSS DEFEATED!',
+                upgradeLabel: 'UPGRADE: ', boss: 'BOSS',
+                buff_triple: 'TRIPLE SHOT', buff_shield: 'SHIELD', buff_freeze: 'FREEZE', buff_rapid: 'RAPID FIRE', buff_double: 'DOUBLE SHOT',
+                upg_wings: 'WINGS', upg_drones: 'DRONES', upg_pierce: 'PIERCE', upg_armor: 'MAGNET SHIELD',
+                plusLife: '+1 LIFE', adUnavailable: 'AD UNAVAILABLE', doubled: '×2 SCORE!',
+                hud_score: 'Score:', hud_lives: 'Lives:', hud_level: 'Level:',
+                btn_start: 'Play', btn_fire: 'FIRE', btn_continue: 'CONTINUE', btn_double: '×2 SCORE', btn_restart: 'RESTART', btn_share: 'SHARE',
+                adtag: '[ AD ]', aria_pause: 'Pause', aria_fire: 'Fire',
+                ad_test: 'AD (test)', ad_hint: 'rewarded video goes here',
+                share: (s) => `I scored ${s} in Cosmic Bugs! Try to beat it 👾`
+            },
+            es: {
+                doc_title: 'Bichos Cósmicos', title: 'BICHOS COSMICOS',
+                recordLine: (s, l) => `Récord: ${s} · nivel ${l}`,
+                pause: 'PAUSA', pauseHint: 'ARRIBA O ESC', gameOver: 'FIN DEL JUEGO',
+                yourScore: (s) => `Tu puntaje: ${s}`,
+                newRecord: 'NUEVO RECORD!', bossDefeated: 'JEFE DERROTADO!',
+                upgradeLabel: 'MEJORA: ', boss: 'JEFE',
+                buff_triple: 'TIRO TRIPLE', buff_shield: 'ESCUDO', buff_freeze: 'CONGELAR', buff_rapid: 'RAFAGA', buff_double: 'TIRO DOBLE',
+                upg_wings: 'ALAS', upg_drones: 'DRONES', upg_pierce: 'PERFORAR', upg_armor: 'ESCUDO IMAN',
+                plusLife: '+1 VIDA', adUnavailable: 'ANUNCIO NO DISPONIBLE', doubled: '×2 PUNTOS!',
+                hud_score: 'Puntos:', hud_lives: 'Vidas:', hud_level: 'Nivel:',
+                btn_start: 'Jugar', btn_fire: 'FUEGO', btn_continue: 'CONTINUAR', btn_double: '×2 PUNTOS', btn_restart: 'REINICIAR', btn_share: 'COMPARTIR',
+                adtag: '[ ANUNCIO ]', aria_pause: 'Pausa', aria_fire: 'Disparar',
+                ad_test: 'ANUNCIO (prueba)', ad_hint: 'aquí irá el video con recompensa',
+                share: (s) => `¡Conseguí ${s} puntos en Cosmic Bugs! Intenta superarlo 👾`
+            },
+            pt: {
+                doc_title: 'Bichos Cósmicos', title: 'BICHOS COSMICOS',
+                recordLine: (s, l) => `Recorde: ${s} · nível ${l}`,
+                pause: 'PAUSA', pauseHint: 'TOQUE ACIMA OU ESC', gameOver: 'FIM DE JOGO',
+                yourScore: (s) => `Sua pontuação: ${s}`,
+                newRecord: 'NOVO RECORDE!', bossDefeated: 'CHEFE DERROTADO!',
+                upgradeLabel: 'MELHORIA: ', boss: 'CHEFE',
+                buff_triple: 'TIRO TRIPLO', buff_shield: 'ESCUDO', buff_freeze: 'CONGELAR', buff_rapid: 'RAJADA', buff_double: 'TIRO DUPLO',
+                upg_wings: 'ASAS', upg_drones: 'DRONES', upg_pierce: 'PERFURAR', upg_armor: 'ESCUDO IMA',
+                plusLife: '+1 VIDA', adUnavailable: 'ANUNCIO INDISPONIVEL', doubled: '×2 PONTOS!',
+                hud_score: 'Pontos:', hud_lives: 'Vidas:', hud_level: 'Nível:',
+                btn_start: 'Jogar', btn_fire: 'FOGO', btn_continue: 'CONTINUAR', btn_double: '×2 PONTOS', btn_restart: 'REINICIAR', btn_share: 'COMPARTILHAR',
+                adtag: '[ ANUNCIO ]', aria_pause: 'Pausa', aria_fire: 'Disparar',
+                ad_test: 'ANUNCIO (teste)', ad_hint: 'aqui vai o vídeo premiado',
+                share: (s) => `Fiz ${s} pontos em Cosmic Bugs! Tente superar 👾`
+            }
+        };
+        function t(key) {
+            const cur = I18N[LANG] && I18N[LANG][key];
+            if (cur !== undefined) return cur;
+            const en = I18N.en[key];
+            return en !== undefined ? en : key;
+        }
+        // Применяем локализацию к статическому DOM (кнопки, подписи HUD, title)
+        function applyI18n() {
+            document.title = t('doc_title');
+            document.documentElement.lang = LANG;
+            const setTxt = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+            setTxt('lblScore', t('hud_score'));
+            setTxt('lblLives', t('hud_lives'));
+            setTxt('lblLevel', t('hud_level'));
+            startButton.textContent = t('btn_start');
+            restartButton.textContent = t('btn_restart');
+            shareBtn.textContent = t('btn_share');
+            fireButton.textContent = t('btn_fire');
+            fireButton.setAttribute('aria-label', t('aria_fire'));
+            pauseButton.setAttribute('aria-label', t('aria_pause'));
+            reviveBtn.innerHTML = t('btn_continue') + '<span class="adtag">' + t('adtag') + '</span>';
+            doubleBtn.innerHTML = t('btn_double') + '<span class="adtag">' + t('adtag') + '</span>';
+        }
         if (isTelegram) {
             tg.ready();
             tg.expand();                                   // на весь экран
@@ -482,7 +588,7 @@
         let upgrades = { wings: 0, drones: 0, pierce: 0, armor: 0 };
         const UPGRADE_KEYS = ['wings', 'drones', 'pierce', 'armor'];
         const UPGRADE_MAX = 3;
-        const UPGRADE_NAMES = { wings: 'КРЫЛЬЯ', drones: 'ДРОНЫ', pierce: 'ПРОБОЙ', armor: 'МАГНИТ-ЩИТ' };
+        // Названия апгрейдов — в словаре i18n (ключи upg_wings/drones/pierce/armor)
         const ROMAN = ['', 'I', 'II', 'III', 'IV'];
         let drones = [];            // спутники-дроны: {cx, cy, side, slot}
         let droneFireTimer = 0;
@@ -1430,7 +1536,7 @@
                     if (pu.type === 'heart') {
                         lives++;
                         updateScore();
-                        spawnFloatText(player.x + player.width / 2, player.y - player.height * 0.4, '+1 ЖИЗНЬ', '#ff6b86');
+                        spawnFloatText(player.x + player.width / 2, player.y - player.height * 0.4, t('plusLife'), '#ff6b86');
                         flashLives();
                     }
                     else bonuses[pu.type] = BONUS_DURATION[pu.type];
@@ -1728,7 +1834,7 @@
             if (key === 'drones') rebuildDrones();
             if (key === 'armor') { armorReady = true; armorTimer = 0; }
             lastUpgradeKey = key;
-            lastUpgradeText = UPGRADE_NAMES[key] + (upgrades[key] > 1 ? ' ' + ROMAN[upgrades[key]] : '');
+            lastUpgradeText = t('upg_' + key) + (upgrades[key] > 1 ? ' ' + ROMAN[upgrades[key]] : '');
             sndFanfare();
         }
 
@@ -1980,7 +2086,7 @@
             ctx.textAlign = 'center';
             ctx.shadowColor = labelCol;
             ctx.shadowBlur = TEXT_GLOW_SMALL;
-            ctx.fillText('БОСС  ' + boss.hp + ' / ' + boss.maxHp, canvas.width / 2, by + bh + Math.round(canvas.width * 0.032));
+            ctx.fillText(t('boss') + '  ' + boss.hp + ' / ' + boss.maxHp, canvas.width / 2, by + bh + Math.round(canvas.width * 0.032));
             ctx.restore();
             ctx.textAlign = 'left';
         }
@@ -2048,12 +2154,12 @@
             ctx.textAlign = 'center';
             ctx.shadowColor = '#1b9dff';
             ctx.shadowBlur = TEXT_GLOW_LARGE;
-            ctx.fillText('КОСМИЧЕСКИЕ ЖУКИ', canvas.width / 2, canvas.height / 2 - titleSize * 1.8);
+            ctx.fillText(t('title'), canvas.width / 2, canvas.height / 2 - titleSize * 1.8);
             ctx.shadowBlur = 0;
             if (hadRecord) {
                 ctx.fillStyle = '#ffd166';
                 ctx.font = `${Math.round(titleSize * 0.42)}px ${FONT_FAMILY}`;
-                ctx.fillText(`Рекорд: ${bestScore} · уровень ${bestLevel}`, canvas.width / 2, canvas.height / 2 - titleSize * 0.7);
+                ctx.fillText(t('recordLine')(bestScore, bestLevel), canvas.width / 2, canvas.height / 2 - titleSize * 0.7);
             }
             ctx.textAlign = 'left';
         }
@@ -2127,11 +2233,11 @@
         function drawBuffIndicators() {
             if (gameOver) return;
             const BONUS_LABELS = [
-                { key: 'triple', label: '> ТРОЙНОЙ ВЫСТРЕЛ', color: '#ff5ed0' },
-                { key: 'shield', label: '> ЩИТ', color: '#3fd8ff' },
-                { key: 'freeze', label: '> ЗАМОРОЗКА', color: '#7fc8ff' },
-                { key: 'rapid', label: '> ОЧЕРЕДЬ', color: '#ff9d2e' },
-                { key: 'double', label: '> ДВОЙНОЙ', color: '#b6ff5e' }
+                { key: 'triple', label: '> ' + t('buff_triple'), color: '#ff5ed0' },
+                { key: 'shield', label: '> ' + t('buff_shield'), color: '#3fd8ff' },
+                { key: 'freeze', label: '> ' + t('buff_freeze'), color: '#7fc8ff' },
+                { key: 'rapid', label: '> ' + t('buff_rapid'), color: '#ff9d2e' },
+                { key: 'double', label: '> ' + t('buff_double'), color: '#b6ff5e' }
             ];
             const buffs = [];
             for (const def of BONUS_LABELS) {
@@ -2163,11 +2269,11 @@
             ctx.textAlign = 'center';
             ctx.shadowColor = '#1b9dff';
             ctx.shadowBlur = TEXT_GLOW_LARGE;
-            ctx.fillText('ПАУЗА', canvas.width / 2, canvas.height / 2 - pSize * 0.3);
+            ctx.fillText(t('pause'), canvas.width / 2, canvas.height / 2 - pSize * 0.3);
             ctx.shadowBlur = 0;
             ctx.fillStyle = '#cfd3f5';
             ctx.font = `${Math.round(pSize * 0.4)}px ${FONT_FAMILY}`;
-            ctx.fillText('СВЕРХУ ИЛИ ESC', canvas.width / 2, canvas.height / 2 + pSize * 0.6);
+            ctx.fillText(t('pauseHint'), canvas.width / 2, canvas.height / 2 + pSize * 0.6);
             ctx.textAlign = 'left';
         }
 
@@ -2183,14 +2289,14 @@
             ctx.textAlign = 'center';
             ctx.shadowColor = '#ff2b5e';
             ctx.shadowBlur = TEXT_GLOW_LARGE;
-            ctx.fillText('ИГРА ОКОНЧЕНА', canvas.width / 2, canvas.height / 2 - bigSize * 2.2);
+            ctx.fillText(t('gameOver'), canvas.width / 2, canvas.height / 2 - bigSize * 2.2);
             ctx.shadowBlur = 0;
             ctx.fillStyle = '#e8e8ff';
             ctx.font = `${smallSize}px ${FONT_FAMILY}`;
-            ctx.fillText(`Ваш счёт: ${score}`, canvas.width / 2, canvas.height / 2 - bigSize * 0.6);
+            ctx.fillText(t('yourScore')(score), canvas.width / 2, canvas.height / 2 - bigSize * 0.6);
             ctx.fillStyle = '#ffd166';
             ctx.font = `${Math.round(smallSize * 0.82)}px ${FONT_FAMILY}`;
-            ctx.fillText(`Рекорд: ${bestScore} · уровень ${bestLevel}`, canvas.width / 2, canvas.height / 2 - bigSize * 0.6 + smallSize * 1.4);
+            ctx.fillText(t('recordLine')(bestScore, bestLevel), canvas.width / 2, canvas.height / 2 - bigSize * 0.6 + smallSize * 1.4);
             ctx.textAlign = 'left';
         }
 
@@ -2206,7 +2312,7 @@
             ctx.fillStyle = '#ffd166';
             ctx.shadowColor = '#ff7c9c';
             ctx.shadowBlur = TEXT_GLOW_RECORD;
-            ctx.fillText('НОВЫЙ РЕКОРД!', canvas.width / 2, canvas.height * 0.3);
+            ctx.fillText(t('newRecord'), canvas.width / 2, canvas.height * 0.3);
             ctx.restore();
         }
 
@@ -2221,7 +2327,7 @@
             ctx.fillStyle = '#9dff5a';
             ctx.shadowColor = '#3aff7a';
             ctx.shadowBlur = TEXT_GLOW_LARGE;
-            ctx.fillText('БОСС ПОВЕРЖЕН!', canvas.width / 2, canvas.height / 2);
+            ctx.fillText(t('bossDefeated'), canvas.width / 2, canvas.height / 2);
             // Полученный апгрейд: иконка над подписью (без перекрытия)
             if (lastUpgradeText) {
                 const ic = upgradeIcons[lastUpgradeKey];
@@ -2237,7 +2343,7 @@
                 ctx.fillStyle = '#ffd166';
                 ctx.shadowColor = '#ff9d2e';
                 ctx.shadowBlur = TEXT_GLOW_LARGE;
-                ctx.fillText('АПГРЕЙД: ' + lastUpgradeText, canvas.width / 2, iconY + isz + us * 1.3);
+                ctx.fillText(t('upgradeLabel') + lastUpgradeText, canvas.width / 2, iconY + isz + us * 1.3);
             }
             ctx.restore();
         }
@@ -2328,9 +2434,9 @@
         function playAdStub(done) {
             const ov = document.createElement('div');
             ov.className = 'ad-overlay';
-            ov.innerHTML = '<div class="adlabel">РЕКЛАМА (тест)</div>' +
+            ov.innerHTML = '<div class="adlabel">' + t('ad_test') + '</div>' +
                            '<div class="adcount">3</div>' +
-                           '<div class="adhint">здесь будет rewarded-ролик</div>';
+                           '<div class="adhint">' + t('ad_hint') + '</div>';
             document.body.appendChild(ov);
             const countEl = ov.querySelector('.adcount');
             let n = 3;
@@ -2352,7 +2458,7 @@
 
         // Поделиться результатом: в Telegram — шаринг в чаты, иначе — системный share
         function shareScore() {
-            const text = 'Я набрал ' + score + ' очков в «КосмоЖуках»! Попробуй побить 👾';
+            const text = t('share')(score);
             if (isTelegram) {
                 tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(SHARE_URL) +
                                     '&text=' + encodeURIComponent(text));
@@ -2389,7 +2495,7 @@
         function doubleScore() {
             usedDouble = true;
             score *= 2;
-            spawnFloatText(canvas.width / 2, canvas.height * 0.5, '×2 ОЧКИ!', '#9dff5a');
+            spawnFloatText(canvas.width / 2, canvas.height * 0.5, t('doubled'), '#9dff5a');
             updateScore();          // обновит и рекорд (checkRecord)
             refreshOverButtons();
         }
@@ -2536,7 +2642,7 @@
         // Продолжить за рекламу
         // Сообщение, если реклама не показалась (нет заполнения/модерация/ошибка)
         function adUnavailable() {
-            spawnFloatText(canvas.width / 2, canvas.height * 0.5, 'РЕКЛАМА НЕДОСТУПНА', '#ff7c9c');
+            spawnFloatText(canvas.width / 2, canvas.height * 0.5, t('adUnavailable'), '#ff7c9c');
         }
         reviveBtn.addEventListener('click', function() {
             initAudio();
@@ -2556,6 +2662,7 @@
         // Запуск единого цикла анимации
         loadBest();
         loadBestFromCloud();
+        applyI18n();
         setUIState('menu');
         fitCanvas();
         lastTime = performance.now();
