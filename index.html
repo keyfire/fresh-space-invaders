@@ -14,8 +14,8 @@
     <meta name="apple-mobile-web-app-title" content="КосмоЖуки">
     <!-- Telegram Mini App SDK: вне Telegram скрипт безвреден (isTelegram=false) -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Adsgram SDK (rewarded-реклама в Telegram) — раскомментировать при подключении:
-    <script src="https://sad.adsgram.ai/js/sad.min.js"></script> -->
+    <!-- Adsgram SDK (rewarded-реклама в Telegram), blockId 37189 -->
+    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -362,7 +362,7 @@
         // Ссылка для «Поделиться» — открывает Mini App в Telegram
         const SHARE_URL = 'https://t.me/kosmozhuki_bot/play';
         // Adsgram: вписать blockId из кабинета (и раскомментировать SDK в <head>)
-        const ADSGRAM_BLOCK_ID = '';
+        const ADSGRAM_BLOCK_ID = '37189';
         if (isTelegram) {
             tg.ready();
             tg.expand();                                   // на весь экран
