@@ -62,11 +62,14 @@ async function hmac(keyBytes, msgBytes) {
 }
 
 // Возвращает объект user, если подпись валидна и данные свежие; иначе null.
-async function verifyInitData(initData, botToken, maxAgeSec = 86400) {
-    if (!initData || !botToken) return null;
+// maxAgeSec = 7 суток: initData переиспользуется в сессии, строгая защита от реплея
+// для игрового топа не нужна.
+async function verifyInitData(initData, botToken, maxAgeSec = 604800) {
+    botToken = String(botToken || '').trim();   // защита от лишних пробелов/переносов в secret
+    if (!initData || !botToken) { console.log('verify FAIL: missing', { hasInit: !!initData, hasToken: !!botToken }); return null; }
     const params = new URLSearchParams(initData);
     const hash = params.get('hash');
-    if (!hash) return null;
+    if (!hash) { console.log('verify FAIL: no hash'); return null; }
     // data_check_string: все поля, кроме hash (и Ed25519-signature), key=value по '\n',
     // отсортированные по ключу; значения – уже декодированные (как их берёт Telegram).
     const entries = [...params.entries()].filter(([k]) => k !== 'hash' && k !== 'signature');
@@ -74,12 +77,14 @@ async function verifyInitData(initData, botToken, maxAgeSec = 86400) {
     const dataCheckString = entries.map(([k, v]) => `${k}=${v}`).join('\n');
     const secret = await hmac(enc('WebAppData'), enc(botToken));
     const computed = toHex(await hmac(secret, enc(dataCheckString)));
-    if (computed !== hash) return null;
+    if (computed !== hash) { console.log('verify FAIL: hash mismatch', { tokenLen: botToken.length, keys: entries.map((e) => e[0]) }); return null; }
     const authDate = parseInt(params.get('auth_date') || '0', 10);
-    if (maxAgeSec && authDate && Date.now() / 1000 - authDate > maxAgeSec) return null;
+    const age = Math.round(Date.now() / 1000 - authDate);
+    if (maxAgeSec && authDate && age > maxAgeSec) { console.log('verify FAIL: stale', { age }); return null; }
     let user = null;
     try { user = JSON.parse(params.get('user') || 'null'); } catch (e) { /* ignore */ }
-    if (!user || !user.id) return null;
+    if (!user || !user.id) { console.log('verify FAIL: no user', { rawUser: params.get('user') }); return null; }
+    console.log('verify OK', { id: user.id, name: user.first_name, age });
     return user;
 }
 
@@ -118,6 +123,7 @@ async function handleSubmit(request, env) {
 
     const name = displayName(user);
     const now = Math.floor(Date.now() / 1000);
+    console.log('submit', { user: user.id, name, score, level });
     // upsert: храним максимальный счёт пользователя; уровень – от лучшего забега.
     await env.DB.prepare(
         `INSERT INTO scores (user_id,name,username,score,level,updated) VALUES (?1,?2,?3,?4,?5,?6)
@@ -190,7 +196,8 @@ async function handleShare(request, env, url) {
             }]],
         },
     };
-    const api = `https://api.telegram.org/bot${env.BOT_TOKEN}/savePreparedInlineMessage`;
+    const token = String(env.BOT_TOKEN || '').trim();
+    const api = `https://api.telegram.org/bot${token}/savePreparedInlineMessage`;
     const tgResp = await fetch(api, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
