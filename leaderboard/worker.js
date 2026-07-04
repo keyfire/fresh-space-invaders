@@ -44,6 +44,7 @@ export default {
             if (url.pathname === '/me' && request.method === 'POST') return await handleMe(request, env);
             if (url.pathname === '/share' && request.method === 'POST') return await handleShare(request, env, url);
             if (url.pathname.startsWith('/card/') && request.method === 'GET') return await handleCard(url, env);
+            if (url.pathname === '/whoami' && request.method === 'GET') return await handleWhoami(env);
             if (url.pathname === '/') return json({ ok: true, service: 'kosmozhuki-leaderboard' });
             return json({ error: 'not_found' }, 404);
         } catch (e) {
@@ -94,6 +95,19 @@ function displayName(user) {
     n = n.trim();
     if (!n) n = user.username ? '@' + user.username : 'Player ' + String(user.id).slice(-4);
     return n.slice(0, 32);
+}
+
+// ===== Диагностика: чей токен лежит в секрете (сам токен не раскрывается) =====
+async function handleWhoami(env) {
+    const token = String(env.BOT_TOKEN || '').trim();
+    const r = await fetch(`https://api.telegram.org/bot${token}/getMe`)
+        .then((x) => x.json()).catch((e) => ({ ok: false, description: String(e) }));
+    return json({
+        ok: !!(r && r.ok),
+        bot: r && r.ok ? r.result.username : null,
+        tokenLen: token.length,
+        error: r && r.ok ? undefined : (r && r.description) || 'unknown',
+    });
 }
 
 // ===== Топ =====
