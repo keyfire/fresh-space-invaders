@@ -62,30 +62,52 @@ async function hmac(keyBytes, msgBytes) {
     return new Uint8Array(await crypto.subtle.sign('HMAC', key, msgBytes));
 }
 
-// Возвращает объект user, если подпись валидна и данные свежие; иначе null.
-// maxAgeSec = 7 суток: initData переиспользуется в сессии, строгая защита от реплея
-// для игрового топа не нужна.
+// Возвращает объект user, если подпись валидна; иначе null.
+// data_check_string строим ручным разбором (контролируем декодирование), пробуем
+// 4 комбинации: с/без поля signature и decodeURIComponent vs '+'->пробел (как в
+// URLSearchParams). Принимаем, если совпал ЛЮБОЙ вариант — все используют секрет из
+// токена, так что подделать нельзя. Лог matched показывает рабочий вариант.
 async function verifyInitData(initData, botToken, maxAgeSec = 604800) {
     botToken = String(botToken || '').trim();   // защита от лишних пробелов/переносов в secret
     if (!initData || !botToken) { console.log('verify FAIL: missing', { hasInit: !!initData, hasToken: !!botToken }); return null; }
     const params = new URLSearchParams(initData);
     const hash = params.get('hash');
     if (!hash) { console.log('verify FAIL: no hash'); return null; }
-    // data_check_string: все поля, кроме hash (и Ed25519-signature), key=value по '\n',
-    // отсортированные по ключу; значения – уже декодированные (как их берёт Telegram).
-    const entries = [...params.entries()].filter(([k]) => k !== 'hash' && k !== 'signature');
-    entries.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-    const dataCheckString = entries.map(([k, v]) => `${k}=${v}`).join('\n');
+    const allKeys = [...params.keys()];
     const secret = await hmac(enc('WebAppData'), enc(botToken));
-    const computed = toHex(await hmac(secret, enc(dataCheckString)));
-    if (computed !== hash) { console.log('verify FAIL: hash mismatch', { tokenLen: botToken.length, keys: entries.map((e) => e[0]) }); return null; }
+
+    async function variant(keepSig, plusToSpace) {
+        const entries = [];
+        for (const part of initData.split('&')) {
+            const i = part.indexOf('=');
+            if (i < 0) continue;
+            const k = part.slice(0, i);
+            if (k === 'hash') continue;
+            if (k === 'signature' && !keepSig) continue;
+            let raw = part.slice(i + 1);
+            if (plusToSpace) raw = raw.replace(/\+/g, '%20');
+            let v; try { v = decodeURIComponent(raw); } catch (e) { v = raw; }
+            entries.push([k, v]);
+        }
+        entries.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+        const dcs = entries.map(([k, v]) => `${k}=${v}`).join('\n');
+        return toHex(await hmac(secret, enc(dcs)));
+    }
+    const A = await variant(false, false);  // без signature, decodeURIComponent
+    const B = await variant(false, true);   // без signature, '+'->пробел
+    const C = await variant(true, false);   // с signature, decodeURIComponent
+    const D = await variant(true, true);    // с signature, '+'->пробел
+    const matched = A === hash ? 'A' : B === hash ? 'B' : C === hash ? 'C' : D === hash ? 'D' : null;
+    console.log('verify diag', { allKeys, matched, hashHead: hash.slice(0, 10), A: A.slice(0, 10), B: B.slice(0, 10), C: C.slice(0, 10), D: D.slice(0, 10) });
+    if (!matched) return null;
+
     const authDate = parseInt(params.get('auth_date') || '0', 10);
     const age = Math.round(Date.now() / 1000 - authDate);
     if (maxAgeSec && authDate && age > maxAgeSec) { console.log('verify FAIL: stale', { age }); return null; }
     let user = null;
     try { user = JSON.parse(params.get('user') || 'null'); } catch (e) { /* ignore */ }
-    if (!user || !user.id) { console.log('verify FAIL: no user', { rawUser: params.get('user') }); return null; }
-    console.log('verify OK', { id: user.id, name: user.first_name, age });
+    if (!user || !user.id) { console.log('verify FAIL: no user'); return null; }
+    console.log('verify OK', { id: user.id, name: user.first_name, matched });
     return user;
 }
 
