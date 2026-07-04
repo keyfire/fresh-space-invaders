@@ -12,6 +12,9 @@ desktop.ini
 # Локальные конфиги Claude Code / превью
 .claude/
 
+# Wrangler (Cloudflare) — локальный кеш/состояние, не для репозитория
+.wrangler/
+
 # Logs / temp
 *.log
 tmp/
