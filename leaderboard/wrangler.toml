@@ -1,0 +1,20 @@
+name = "kosmozhuki-leaderboard"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# База D1 для рекордов и карточек шаринга.
+# Создать: wrangler d1 create kosmozhuki  ->  вставить сюда database_id из вывода.
+[[d1_databases]]
+binding = "DB"
+database_name = "kosmozhuki"
+database_id = "PASTE_DATABASE_ID_AFTER_CREATE"
+
+# Публичный URL воркера – нужен, чтобы Telegram тянул PNG карточки по абсолютной ссылке.
+# После ПЕРВОГО деплоя вписать сюда рабочий адрес и задеплоить ещё раз, напр.:
+#   PUBLIC_URL = "https://kosmozhuki-leaderboard.<ваш-субдомен>.workers.dev"
+# Если оставить пустым, воркер берёт origin входящего запроса (обычно тоже верно).
+[vars]
+PUBLIC_URL = ""
+
+# Секрет BOT_TOKEN (токен бота из BotFather) задаётся отдельно и НЕ хранится в файле:
+#   wrangler secret put BOT_TOKEN
