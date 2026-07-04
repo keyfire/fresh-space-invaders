@@ -308,6 +308,79 @@
         .ad-overlay .adlabel { font-size: clamp(10px, 3vw, 15px); color: #9dff5a; }
         .ad-overlay .adcount { font-size: clamp(22px, 8vw, 44px); color: #ffd166; }
         .ad-overlay .adhint { font-size: clamp(8px, 2.4vw, 11px); color: #6a7090; }
+
+        /* Кнопка рейтинга — золотая (в меню и на экране проигрыша) */
+        .lb-btn-menu {
+            top: 67%;
+            padding: 11px 18px;
+            font-size: clamp(9px, 2.2vw, 12px);
+            background: linear-gradient(180deg, #ffd98a, #f0a93a);
+            box-shadow: 0 0 14px rgba(240, 169, 58, 0.5);
+        }
+        .lb-btn {
+            background: linear-gradient(180deg, #ffd98a, #f0a93a);
+            box-shadow: 0 0 14px rgba(240, 169, 58, 0.5);
+        }
+
+        /* Оверлей глобального рейтинга */
+        .lb-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 60;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(3, 3, 10, 0.9);
+            padding: 16px;
+            font-family: inherit;
+        }
+        .lb-overlay.open { display: flex; }
+        .lb-panel {
+            width: min(440px, 94vw);
+            max-height: 86vh;
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(180deg, #0b0b1e, #05050f);
+            border: 2px solid #2bd1ff;
+            border-radius: 10px;
+            box-shadow: 0 0 24px rgba(43, 209, 255, 0.35);
+            overflow: hidden;
+        }
+        .lb-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(43, 209, 255, 0.3);
+        }
+        .lb-title { color: #ffd166; font-size: clamp(11px, 3vw, 15px); text-shadow: 0 0 6px rgba(255, 157, 46, 0.6); }
+        .lb-close { background: none; border: none; color: #ff7c9c; font-family: inherit; font-size: 15px; cursor: pointer; padding: 4px 6px; }
+        .lb-list { overflow-y: auto; padding: 6px 0; -webkit-overflow-scrolling: touch; }
+        .lb-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            font-size: clamp(8px, 2.3vw, 11px);
+            color: #e8e8ff;
+            line-height: 1.4;
+        }
+        .lb-row .lb-rank { width: 2.6em; color: #6bd5ff; text-align: right; flex: none; }
+        .lb-row .lb-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .lb-row .lb-score { flex: none; color: #ffd166; }
+        .lb-row.me { background: rgba(43, 209, 255, 0.14); }
+        .lb-row.top1 .lb-rank { color: #ffd700; }
+        .lb-row.top2 .lb-rank { color: #cfd6e6; }
+        .lb-row.top3 .lb-rank { color: #e0a24a; }
+        .lb-msg { padding: 20px 14px; text-align: center; color: #8a90b0; font-size: clamp(9px, 2.5vw, 12px); line-height: 1.6; }
+        .lb-foot {
+            padding: 10px 14px;
+            border-top: 1px solid rgba(43, 209, 255, 0.3);
+            text-align: center;
+            color: #9dff5a;
+            font-size: clamp(8px, 2.4vw, 11px);
+            min-height: 1em;
+        }
     </style>
 </head>
 <body>
@@ -325,12 +398,26 @@
                 <button class="ctrl fire-btn" id="fireButton" aria-label="Выстрел">ОГОНЬ</button>
             </div>
             <button class="center-btn" id="startButton">Начать игру</button>
+            <button class="center-btn lb-btn-menu" id="lbBtnMenu">🏆 РЕЙТИНГ</button>
             <div class="over-actions" id="overActions">
                 <button class="ad-btn" id="reviveBtn">ПРОДОЛЖИТЬ<span class="adtag">[ РЕКЛАМА ]</span></button>
                 <button class="ad-btn" id="doubleBtn">×2 ОЧКИ<span class="adtag">[ РЕКЛАМА ]</span></button>
                 <button class="restart-btn" id="restartButton">ЗАНОВО</button>
                 <button class="share-btn" id="shareBtn">ПОДЕЛИТЬСЯ</button>
+                <button class="lb-btn" id="lbBtnOver">🏆 РЕЙТИНГ</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Оверлей глобального рейтинга -->
+    <div class="lb-overlay" id="lbOverlay">
+        <div class="lb-panel">
+            <div class="lb-head">
+                <span class="lb-title" id="lbTitle">РЕЙТИНГ</span>
+                <button class="lb-close" id="lbClose" aria-label="Закрыть">✕</button>
+            </div>
+            <div class="lb-list" id="lbList"></div>
+            <div class="lb-foot" id="lbFoot"></div>
         </div>
     </div>
 
@@ -350,6 +437,13 @@
         const doubleBtn = document.getElementById('doubleBtn');
         const restartButton = document.getElementById('restartButton');
         const shareBtn = document.getElementById('shareBtn');
+        const lbBtnMenu = document.getElementById('lbBtnMenu');
+        const lbBtnOver = document.getElementById('lbBtnOver');
+        const lbOverlay = document.getElementById('lbOverlay');
+        const lbList = document.getElementById('lbList');
+        const lbFoot = document.getElementById('lbFoot');
+        const lbClose = document.getElementById('lbClose');
+        let myRank = null, myTotal = 0;   // моё место в мире (после submit/me)
 
         // Сенсорное устройство — показываем тач-контролы и приподнимаем корабль над ними
         const isTouch = window.matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
@@ -363,6 +457,9 @@
         const SHARE_URL = 'https://t.me/kosmozhuki_bot/play';
         // Adsgram: вписать blockId из кабинета (и раскомментировать SDK в <head>)
         const ADSGRAM_BLOCK_ID = '37189';
+        // Глобальный лидерборд (Cloudflare Worker + D1). Вписать URL после деплоя
+        // (см. leaderboard/README.md). Пусто = топ и медиа-шаринг тихо выключены.
+        const LEADERBOARD_URL = '';
 
         // ===== Локализация (i18n) — язык по локали пользователя =====
         // Поддержка RU/EN/ES/PT (языки каталога FindMini). Прочие локали → EN.
@@ -395,7 +492,9 @@
                 btn_start: 'Начать игру', btn_fire: 'ОГОНЬ', btn_continue: 'ПРОДОЛЖИТЬ', btn_double: '×2 ОЧКИ', btn_restart: 'ЗАНОВО', btn_share: 'ПОДЕЛИТЬСЯ',
                 adtag: '[ РЕКЛАМА ]', aria_pause: 'Пауза', aria_fire: 'Выстрел',
                 ad_test: 'РЕКЛАМА (тест)', ad_hint: 'здесь будет rewarded-ролик',
-                share: (s) => `Я набрал ${s} очков в «Космических жуках»! Попробуй побить 👾`
+                share: (s) => `Я набрал ${s} очков в «Космических жуках»! Попробуй побить 👾`,
+                btn_leaderboard: 'РЕЙТИНГ', lb_title: 'РЕЙТИНГ', lb_loading: 'Загрузка...', lb_empty: 'Пока пусто. Будь первым!', lb_offline: 'Рейтинг недоступен', lb_you: 'ВЫ',
+                lb_rankLine: (r, tot) => `Ваше место: #${r} из ${tot}`, card_beat: 'Обгони меня! 👾'
             },
             en: {
                 doc_title: 'Cosmic Bugs', title: 'COSMIC BUGS',
@@ -411,7 +510,9 @@
                 btn_start: 'Play', btn_fire: 'FIRE', btn_continue: 'CONTINUE', btn_double: '×2 SCORE', btn_restart: 'RESTART', btn_share: 'SHARE',
                 adtag: '[ AD ]', aria_pause: 'Pause', aria_fire: 'Fire',
                 ad_test: 'AD (test)', ad_hint: 'rewarded video goes here',
-                share: (s) => `I scored ${s} in Cosmic Bugs! Try to beat it 👾`
+                share: (s) => `I scored ${s} in Cosmic Bugs! Try to beat it 👾`,
+                btn_leaderboard: 'LEADERBOARD', lb_title: 'LEADERBOARD', lb_loading: 'Loading...', lb_empty: 'Empty for now. Be the first!', lb_offline: 'Leaderboard unavailable', lb_you: 'YOU',
+                lb_rankLine: (r, tot) => `Your rank: #${r} of ${tot}`, card_beat: 'Beat my score! 👾'
             },
             es: {
                 doc_title: 'Bichos Cósmicos', title: 'BICHOS COSMICOS',
@@ -427,7 +528,9 @@
                 btn_start: 'Jugar', btn_fire: 'FUEGO', btn_continue: 'CONTINUAR', btn_double: '×2 PUNTOS', btn_restart: 'REINICIAR', btn_share: 'COMPARTIR',
                 adtag: '[ ANUNCIO ]', aria_pause: 'Pausa', aria_fire: 'Disparar',
                 ad_test: 'ANUNCIO (prueba)', ad_hint: 'aquí irá el video con recompensa',
-                share: (s) => `¡Conseguí ${s} puntos en Cosmic Bugs! Intenta superarlo 👾`
+                share: (s) => `¡Conseguí ${s} puntos en Cosmic Bugs! Intenta superarlo 👾`,
+                btn_leaderboard: 'RANKING', lb_title: 'RANKING', lb_loading: 'Cargando...', lb_empty: '¡Vacío por ahora. Sé el primero!', lb_offline: 'Ranking no disponible', lb_you: 'TU',
+                lb_rankLine: (r, tot) => `Tu puesto: #${r} de ${tot}`, card_beat: '¡Supérame! 👾'
             },
             pt: {
                 doc_title: 'Bichos Cósmicos', title: 'BICHOS COSMICOS',
@@ -443,7 +546,9 @@
                 btn_start: 'Jogar', btn_fire: 'FOGO', btn_continue: 'CONTINUAR', btn_double: '×2 PONTOS', btn_restart: 'REINICIAR', btn_share: 'COMPARTILHAR',
                 adtag: '[ ANUNCIO ]', aria_pause: 'Pausa', aria_fire: 'Disparar',
                 ad_test: 'ANUNCIO (teste)', ad_hint: 'aqui vai o vídeo premiado',
-                share: (s) => `Fiz ${s} pontos em Cosmic Bugs! Tente superar 👾`
+                share: (s) => `Fiz ${s} pontos em Cosmic Bugs! Tente superar 👾`,
+                btn_leaderboard: 'RANKING', lb_title: 'RANKING', lb_loading: 'Carregando...', lb_empty: 'Vazio por enquanto. Seja o primeiro!', lb_offline: 'Ranking indisponível', lb_you: 'VOCE',
+                lb_rankLine: (r, tot) => `Sua posição: #${r} de ${tot}`, card_beat: 'Me supere! 👾'
             },
             tr: {
                 doc_title: 'Uzay Böcekleri', title: 'UZAY BOCEKLERI',
@@ -459,7 +564,9 @@
                 btn_start: 'Oyna', btn_fire: 'ATES', btn_continue: 'DEVAM ET', btn_double: '×2 PUAN', btn_restart: 'YENIDEN', btn_share: 'PAYLAS',
                 adtag: '[ REKLAM ]', aria_pause: 'Duraklat', aria_fire: 'Ateş',
                 ad_test: 'REKLAM (test)', ad_hint: 'ödüllü video burada olacak',
-                share: (s) => `Uzay Böcekleri'nde ${s} puan yaptım! Geçmeyi dene 👾`
+                share: (s) => `Uzay Böcekleri'nde ${s} puan yaptım! Geçmeyi dene 👾`,
+                btn_leaderboard: 'SIRALAMA', lb_title: 'SIRALAMA', lb_loading: 'Yükleniyor...', lb_empty: 'Henüz kimse yok. Ilk sen ol!', lb_offline: 'Siralama yok', lb_you: 'SEN',
+                lb_rankLine: (r, tot) => `Yerin: #${r} / ${tot}`, card_beat: 'Beni geç! 👾'
             }
         };
         function t(key) {
@@ -479,6 +586,10 @@
             startButton.textContent = t('btn_start');
             restartButton.textContent = t('btn_restart');
             shareBtn.textContent = t('btn_share');
+            lbBtnMenu.textContent = '🏆 ' + t('btn_leaderboard');
+            lbBtnOver.textContent = '🏆 ' + t('btn_leaderboard');
+            const lbTitleEl = document.getElementById('lbTitle');
+            if (lbTitleEl) lbTitleEl.textContent = t('lb_title');
             fireButton.textContent = t('btn_fire');
             fireButton.setAttribute('aria-label', t('aria_fire'));
             pauseButton.setAttribute('aria-label', t('aria_pause'));
@@ -2470,11 +2581,190 @@
             reviveBtn.style.display = usedRevive < MAX_REVIVES ? 'block' : 'none';
             doubleBtn.style.display = (!usedDouble && score > 0) ? 'block' : 'none';
             shareBtn.style.display = (isTelegram || navigator.share) ? 'block' : 'none';
+            lbBtnOver.style.display = LEADERBOARD_URL ? 'block' : 'none';
         }
 
-        // Поделиться результатом: в Telegram — шаринг в чаты, иначе — системный share
+        // ===== Глобальный лидерборд (Cloudflare Worker + D1) =====
+        // Клиент лишь дёргает эндпоинты; при пустом LEADERBOARD_URL или ошибке —
+        // фича тихо выключается, локальный рекорд продолжает работать.
+
+        // Отправить счёт (только в Telegram — там есть подписанный initData).
+        function submitScore() {
+            if (!LEADERBOARD_URL || !isTelegram || !tg.initData) return;
+            fetch(LEADERBOARD_URL + '/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ initData: tg.initData, score: score, level: level }),
+            }).then(function(r) { return r.json(); }).then(function(d) {
+                if (d && d.ok) { myRank = d.rank; myTotal = d.total; }
+            }).catch(function() {});
+        }
+
+        // Показать оверлей рейтинга и подтянуть топ.
+        function openLeaderboard() {
+            if (!LEADERBOARD_URL) return;
+            lbOverlay.classList.add('open');
+            lbList.innerHTML = '<div class="lb-msg">' + t('lb_loading') + '</div>';
+            lbFoot.textContent = '';
+            fetch(LEADERBOARD_URL + '/top?limit=50')
+                .then(function(r) { return r.json(); })
+                .then(function(d) { renderLeaderboard(d && d.top ? d.top : [], (d && d.total) || 0); })
+                .catch(function() { lbList.innerHTML = '<div class="lb-msg">' + t('lb_offline') + '</div>'; });
+        }
+        function closeLeaderboard() { lbOverlay.classList.remove('open'); }
+
+        function renderLeaderboard(top, total) {
+            if (!top.length) {
+                lbList.innerHTML = '<div class="lb-msg">' + t('lb_empty') + '</div>';
+            } else {
+                // Своя строка подсвечивается по авторитетному рангу от сервера (myRank).
+                let html = '';
+                let matched = false;
+                for (const row of top) {
+                    const isMe = !matched && myRank && row.rank === myRank;
+                    if (isMe) matched = true;
+                    const cls = 'lb-row' + (row.rank <= 3 ? ' top' + row.rank : '') + (isMe ? ' me' : '');
+                    html += '<div class="' + cls + '"><span class="lb-rank">' + row.rank + '</span>' +
+                            '<span class="lb-name">' + escapeHtml(row.name) + '</span>' +
+                            '<span class="lb-score">' + row.score + '</span></div>';
+                }
+                lbList.innerHTML = html;
+            }
+            // Подвал: своё место в мире (если известно и не попал в видимый топ).
+            if (myRank && (myTotal || total)) {
+                lbFoot.textContent = t('lb_rankLine')(myRank, myTotal || total);
+            } else {
+                lbFoot.textContent = '';
+            }
+        }
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, function(c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
+        // ===== Карточка счёта для шаринга (offscreen PNG) =====
+        // drawSprite привязан к главному ctx, поэтому здесь — свой мини-художник спрайтов.
+        function paintSprite(c, grid, palette, x, y, w, h, glow) {
+            const cols = grid[0].length, rows = grid.length;
+            const cell = Math.min(w / cols, h / rows);
+            const ox = x + (w - cell * cols) / 2, oy = y + (h - cell * rows) / 2;
+            c.save();
+            if (glow) { c.shadowColor = glow.color; c.shadowBlur = glow.blur; }
+            for (let r = 0; r < rows; r++) {
+                for (let col = 0; col < cols; col++) {
+                    const color = palette[grid[r][col]];
+                    if (color) { c.fillStyle = color; c.fillRect(ox + col * cell, oy + r * cell, cell + 0.5, cell + 0.5); }
+                }
+            }
+            c.restore();
+        }
+        function buildScoreCardPng() {
+            const W = 640, H = 800;
+            const cv = document.createElement('canvas');
+            cv.width = W; cv.height = H;
+            const c = cv.getContext('2d');
+            const g = c.createLinearGradient(0, 0, 0, H);
+            g.addColorStop(0, '#0b0b22'); g.addColorStop(1, '#05050f');
+            c.fillStyle = g; c.fillRect(0, 0, W, H);
+            // Звёзды (детерминированные)
+            let seed = 12345;
+            const rnd = function() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+            for (let i = 0; i < 70; i++) {
+                c.globalAlpha = 0.3 + rnd() * 0.6;
+                c.fillStyle = '#ffffff';
+                const sz = rnd() * 2 + 0.5;
+                c.fillRect(rnd() * W, rnd() * H, sz, sz);
+            }
+            c.globalAlpha = 1;
+            c.strokeStyle = '#2bd1ff'; c.lineWidth = 4; c.strokeRect(6, 6, W - 12, H - 12);
+            c.textAlign = 'center';
+            // Заголовок (ужимаем шрифт под ширину)
+            let ts = 34; c.font = 'bold ' + ts + 'px ' + FONT_FAMILY;
+            while (c.measureText(t('title')).width > W - 60 && ts > 10) { ts -= 2; c.font = 'bold ' + ts + 'px ' + FONT_FAMILY; }
+            c.fillStyle = '#ffd166'; c.shadowColor = '#ff9d2e'; c.shadowBlur = 8;
+            c.fillText(t('title'), W / 2, 84);
+            c.shadowBlur = 0;
+            // Три жука для антуража
+            try {
+                const form = bugForms[0][0];
+                const cols = ['#ff5e7e', '#ffe14a', '#6bd5ff'];
+                for (let i = 0; i < 3; i++) {
+                    const col = cols[i];
+                    const pal = { 'X': col, 'D': shade(col, 0.6), 'L': shade(col, 1.4), 'e': '#0a0a16', '.': null };
+                    paintSprite(c, form, pal, W / 2 + (i - 1) * 92 - 28, 116, 56, 56, null);
+                }
+            } catch (e) { /* без жуков не страшно */ }
+            // Корабль-герой
+            paintSprite(c, shipFrame, shipPalette, W / 2 - 90, 196, 180, 180, { color: '#2bd1ff', blur: 16 });
+            // Подпись «СЧЁТ» + крупное число
+            c.fillStyle = '#8fb7ff'; c.font = '16px ' + FONT_FAMILY;
+            c.fillText(t('hud_score').replace(':', '').toUpperCase(), W / 2, 438);
+            c.fillStyle = '#ffffff'; c.shadowColor = '#2bd1ff'; c.shadowBlur = 12;
+            c.font = 'bold 72px ' + FONT_FAMILY;
+            c.fillText(String(score), W / 2, 512);
+            c.shadowBlur = 0;
+            c.fillStyle = '#9dff5a'; c.font = '20px ' + FONT_FAMILY;
+            c.fillText(t('hud_level').replace(':', '').toUpperCase() + ' ' + level, W / 2, 560);
+            // Призыв + ссылка
+            c.fillStyle = '#ff7c9c'; c.font = '18px ' + FONT_FAMILY;
+            c.fillText(t('card_beat'), W / 2, 686);
+            c.fillStyle = '#6bd5ff'; c.font = '15px ' + FONT_FAMILY;
+            c.fillText('t.me/kosmozhuki_bot', W / 2, 728);
+            return { dataUrl: cv.toDataURL('image/png'), w: W, h: H };
+        }
+        function dataUrlToFile(dataUrl, name) {
+            const arr = dataUrl.split(',');
+            const bin = atob(arr[1]);
+            const u8 = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+            return new File([u8], name, { type: 'image/png' });
+        }
+
+        // Поделиться результатом карточкой-картинкой.
+        //  - в Telegram: карточка -> подготовленное inline-сообщение (фото) через воркер;
+        //    fallback — прежний шаринг ссылки текстом;
+        //  - вне Telegram: системный share с файлом, иначе текст+ссылка.
         function shareScore() {
             const text = t('share')(score);
+            let card = null;
+            try { card = buildScoreCardPng(); } catch (e) { card = null; }
+
+            if (isTelegram) {
+                if (card && LEADERBOARD_URL && tg.initData && typeof tg.shareMessage === 'function') {
+                    fetch(LEADERBOARD_URL + '/share', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            initData: tg.initData, png: card.dataUrl, text: text,
+                            w: card.w, h: card.h, gameUrl: SHARE_URL, playText: '🎮 ' + t('btn_start'),
+                        }),
+                    }).then(function(r) { return r.json(); }).then(function(d) {
+                        if (d && d.ok && d.prepared_message_id) {
+                            tg.shareMessage(d.prepared_message_id, function(sent) {
+                                if (!sent) shareLinkFallback(text);
+                            });
+                        } else { shareLinkFallback(text); }
+                    }).catch(function() { shareLinkFallback(text); });
+                } else {
+                    shareLinkFallback(text);
+                }
+                return;
+            }
+            // Вне Telegram: системный share с картинкой, если поддерживается
+            if (card && navigator.canShare) {
+                try {
+                    const file = dataUrlToFile(card.dataUrl, 'cosmic-bugs.png');
+                    if (navigator.canShare({ files: [file] })) {
+                        navigator.share({ files: [file], text: text, url: SHARE_URL }).catch(function() {});
+                        return;
+                    }
+                } catch (e) { /* упадём в текстовый share */ }
+            }
+            if (navigator.share) { navigator.share({ text: text, url: SHARE_URL }).catch(function() {}); }
+        }
+        // Прежний способ: открыть диалог пересылки ссылки с текстом.
+        function shareLinkFallback(text) {
             if (isTelegram) {
                 tg.openTelegramLink('https://t.me/share/url?url=' + encodeURIComponent(SHARE_URL) +
                                     '&text=' + encodeURIComponent(text));
@@ -2514,6 +2804,7 @@
             spawnFloatText(canvas.width / 2, canvas.height * 0.5, t('doubled'), '#9dff5a');
             updateScore();          // обновит и рекорд (checkRecord)
             refreshOverButtons();
+            submitScore();          // удвоенный счёт — обновить место в топе
         }
 
         // Конец игры
@@ -2523,6 +2814,7 @@
             stopFire();
             refreshOverButtons();
             setUIState('over');
+            submitScore();          // отправить результат в глобальный топ
         }
 
         // Обработчик нажатия клавиш
@@ -2671,6 +2963,12 @@
         });
         shareBtn.addEventListener('click', shareScore);
 
+        // Кнопки и оверлей глобального рейтинга
+        lbBtnMenu.addEventListener('click', openLeaderboard);
+        lbBtnOver.addEventListener('click', openLeaderboard);
+        lbClose.addEventListener('click', closeLeaderboard);
+        lbOverlay.addEventListener('click', function(e) { if (e.target === lbOverlay) closeLeaderboard(); });
+
         // Перестройка холста при изменении размера/повороте экрана
         window.addEventListener('resize', fitCanvas);
         window.addEventListener('orientationchange', function() { setTimeout(fitCanvas, 200); });
@@ -2679,6 +2977,7 @@
         loadBest();
         loadBestFromCloud();
         applyI18n();
+        if (!LEADERBOARD_URL) lbBtnMenu.style.display = 'none';   // топ не настроен — прячем кнопку
         setUIState('menu');
         fitCanvas();
         lastTime = performance.now();
