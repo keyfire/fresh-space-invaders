@@ -44,7 +44,6 @@ export default {
             if (url.pathname === '/me' && request.method === 'POST') return await handleMe(request, env);
             if (url.pathname === '/share' && request.method === 'POST') return await handleShare(request, env, url);
             if (url.pathname.startsWith('/card/') && request.method === 'GET') return await handleCard(url, env);
-            if (url.pathname === '/whoami' && request.method === 'GET') return await handleWhoami(env);
             if (url.pathname === '/') return json({ ok: true, service: 'kosmozhuki-leaderboard' });
             return json({ error: 'not_found' }, 404);
         } catch (e) {
@@ -63,51 +62,37 @@ async function hmac(keyBytes, msgBytes) {
 }
 
 // Возвращает объект user, если подпись валидна; иначе null.
-// data_check_string строим ручным разбором (контролируем декодирование), пробуем
-// 4 комбинации: с/без поля signature и decodeURIComponent vs '+'->пробел (как в
-// URLSearchParams). Принимаем, если совпал ЛЮБОЙ вариант — все используют секрет из
-// токена, так что подделать нельзя. Лог matched показывает рабочий вариант.
+// data_check_string = все поля initData, КРОМЕ hash (поле signature ВКЛЮЧАЕТСЯ —
+// современный Telegram считает hash вместе с ним), key=value через '\n', сортировка
+// по ключу. Разбираем вручную и декодируем decodeURIComponent: URLSearchParams
+// превращает '+' в пробел и ломает подпись на значениях с '+'.
+// maxAgeSec = 7 суток: initData переиспользуется в сессии, строгая защита от реплея
+// для игрового топа не нужна.
 async function verifyInitData(initData, botToken, maxAgeSec = 604800) {
     botToken = String(botToken || '').trim();   // защита от лишних пробелов/переносов в secret
-    if (!initData || !botToken) { console.log('verify FAIL: missing', { hasInit: !!initData, hasToken: !!botToken }); return null; }
+    if (!initData || !botToken) return null;
     const params = new URLSearchParams(initData);
     const hash = params.get('hash');
-    if (!hash) { console.log('verify FAIL: no hash'); return null; }
-    const allKeys = [...params.keys()];
-    const secret = await hmac(enc('WebAppData'), enc(botToken));
-
-    async function variant(keepSig, plusToSpace) {
-        const entries = [];
-        for (const part of initData.split('&')) {
-            const i = part.indexOf('=');
-            if (i < 0) continue;
-            const k = part.slice(0, i);
-            if (k === 'hash') continue;
-            if (k === 'signature' && !keepSig) continue;
-            let raw = part.slice(i + 1);
-            if (plusToSpace) raw = raw.replace(/\+/g, '%20');
-            let v; try { v = decodeURIComponent(raw); } catch (e) { v = raw; }
-            entries.push([k, v]);
-        }
-        entries.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-        const dcs = entries.map(([k, v]) => `${k}=${v}`).join('\n');
-        return toHex(await hmac(secret, enc(dcs)));
+    if (!hash) return null;
+    const entries = [];
+    for (const part of initData.split('&')) {
+        const i = part.indexOf('=');
+        if (i < 0) continue;
+        const k = part.slice(0, i);
+        if (k === 'hash') continue;   // исключаем ТОЛЬКО hash; signature участвует в подписи
+        let v; try { v = decodeURIComponent(part.slice(i + 1)); } catch (e) { v = part.slice(i + 1); }
+        entries.push([k, v]);
     }
-    const A = await variant(false, false);  // без signature, decodeURIComponent
-    const B = await variant(false, true);   // без signature, '+'->пробел
-    const C = await variant(true, false);   // с signature, decodeURIComponent
-    const D = await variant(true, true);    // с signature, '+'->пробел
-    const matched = A === hash ? 'A' : B === hash ? 'B' : C === hash ? 'C' : D === hash ? 'D' : null;
-    console.log('verify diag', { allKeys, matched, hashHead: hash.slice(0, 10), A: A.slice(0, 10), B: B.slice(0, 10), C: C.slice(0, 10), D: D.slice(0, 10) });
-    if (!matched) return null;
-
+    entries.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    const dataCheckString = entries.map(([k, v]) => `${k}=${v}`).join('\n');
+    const secret = await hmac(enc('WebAppData'), enc(botToken));
+    const computed = toHex(await hmac(secret, enc(dataCheckString)));
+    if (computed !== hash) return null;
     const authDate = parseInt(params.get('auth_date') || '0', 10);
-    const age = Math.round(Date.now() / 1000 - authDate);
-    if (maxAgeSec && authDate && age > maxAgeSec) { console.log('verify FAIL: stale', { age }); return null; }
+    if (maxAgeSec && authDate && Date.now() / 1000 - authDate > maxAgeSec) return null;
     let user = null;
     try { user = JSON.parse(params.get('user') || 'null'); } catch (e) { /* ignore */ }
-    if (!user || !user.id) { console.log('verify FAIL: no user'); return null; }
-    console.log('verify OK', { id: user.id, name: user.first_name, matched });
+    if (!user || !user.id) return null;
     return user;
 }
 
@@ -117,19 +102,6 @@ function displayName(user) {
     n = n.trim();
     if (!n) n = user.username ? '@' + user.username : 'Player ' + String(user.id).slice(-4);
     return n.slice(0, 32);
-}
-
-// ===== Диагностика: чей токен лежит в секрете (сам токен не раскрывается) =====
-async function handleWhoami(env) {
-    const token = String(env.BOT_TOKEN || '').trim();
-    const r = await fetch(`https://api.telegram.org/bot${token}/getMe`)
-        .then((x) => x.json()).catch((e) => ({ ok: false, description: String(e) }));
-    return json({
-        ok: !!(r && r.ok),
-        bot: r && r.ok ? r.result.username : null,
-        tokenLen: token.length,
-        error: r && r.ok ? undefined : (r && r.description) || 'unknown',
-    });
 }
 
 // ===== Топ =====
@@ -159,7 +131,6 @@ async function handleSubmit(request, env) {
 
     const name = displayName(user);
     const now = Math.floor(Date.now() / 1000);
-    console.log('submit', { user: user.id, name, score, level });
     // upsert: храним максимальный счёт пользователя; уровень – от лучшего забега.
     await env.DB.prepare(
         `INSERT INTO scores (user_id,name,username,score,level,updated) VALUES (?1,?2,?3,?4,?5,?6)
