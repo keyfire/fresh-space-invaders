@@ -489,7 +489,7 @@
         const lbList = document.getElementById('lbList');
         const lbFoot = document.getElementById('lbFoot');
         const lbClose = document.getElementById('lbClose');
-        let myRank = null, myTotal = 0;   // моё место в мире (после submit/me)
+        let myRank = null;   // моё место в мире (ранг от сервера после submit)
         const dailyBtn = document.getElementById('dailyBtn');
         const dailyOverlay = document.getElementById('dailyOverlay');
         const dailyBody = document.getElementById('dailyBody');
@@ -507,9 +507,11 @@
         const SHARE_URL = 'https://t.me/kosmozhuki_bot/play';
         // Adsgram: вписать blockId из кабинета (и раскомментировать SDK в <head>)
         const ADSGRAM_BLOCK_ID = '37189';
-        // Глобальный лидерборд (Cloudflare Worker + D1). Вписать URL после деплоя
-        // (см. leaderboard/README.md). Пусто = топ и медиа-шаринг тихо выключены.
-        const LEADERBOARD_URL = 'https://kosmozhuki-leaderboard.keyfire.workers.dev';
+        // Глобальный лидерборд — общий бэкенд портфеля на VPS (api.keyfiregames.ru,
+        // node:sqlite; см. passive-money/games/leaderboard). Мультиигровой API:
+        // счёт/топ/шаринг идут с полем game. Пусто = топ и шаринг тихо выключены.
+        const LEADERBOARD_URL = 'https://api.keyfiregames.ru';
+        const GAME_SLUG = 'kosmozhuki';
 
         // ===== Локализация (i18n) — язык по локали пользователя =====
         // Поддержка RU/EN/ES/PT (языки каталога FindMini). Прочие локали → EN.
@@ -2735,9 +2737,9 @@
             fetch(LEADERBOARD_URL + '/submit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ initData: tg.initData, score: score, level: level }),
+                body: JSON.stringify({ game: GAME_SLUG, initData: tg.initData, score: score, level: level }),
             }).then(function(r) { return r.json(); }).then(function(d) {
-                if (d && d.ok) { myRank = d.rank; myTotal = d.total; }
+                if (d && d.ok) { myRank = d.rank; }
             }).catch(function() {});
         }
 
@@ -2747,7 +2749,7 @@
             lbOverlay.classList.add('open');
             lbList.innerHTML = '<div class="lb-msg">' + t('lb_loading') + '</div>';
             lbFoot.textContent = '';
-            fetch(LEADERBOARD_URL + '/top?limit=50')
+            fetch(LEADERBOARD_URL + '/top?game=' + GAME_SLUG + '&limit=50')
                 .then(function(r) { return r.json(); })
                 .then(function(d) { renderLeaderboard(d && d.top ? d.top : [], (d && d.total) || 0); })
                 .catch(function() { lbList.innerHTML = '<div class="lb-msg">' + t('lb_offline') + '</div>'; });
@@ -2771,9 +2773,12 @@
                 }
                 lbList.innerHTML = html;
             }
-            // Подвал: своё место в мире (если известно и не попал в видимый топ).
-            if (myRank && (myTotal || total)) {
-                lbFoot.textContent = t('lb_rankLine')(myRank, myTotal || total);
+            // Подвал: своё место в мире. VPS-бэкенд не отдаёт total — тогда
+            // показываем ранг без знаменателя (язык-нейтрально).
+            if (myRank && total) {
+                lbFoot.textContent = t('lb_rankLine')(myRank, total);
+            } else if (myRank) {
+                lbFoot.textContent = '🏆 #' + myRank;
             } else {
                 lbFoot.textContent = '';
             }
@@ -2917,7 +2922,7 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            initData: tg.initData, png: card.dataUrl, text: text,
+                            game: GAME_SLUG, initData: tg.initData, png: card.dataUrl, text: text,
                             w: card.w, h: card.h, gameUrl: SHARE_URL, playText: '🎮 ' + t('btn_start'),
                         }),
                     }).then(function(r) { return r.json(); }).then(function(d) {

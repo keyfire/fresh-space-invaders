@@ -49,6 +49,11 @@ html = must(html, '    <script src="https://telegram.org/js/telegram-web-app.js"
 html = must(html, '    <!-- Adsgram SDK (rewarded-реклама в Telegram), blockId 37189 -->\n', '');
 html = must(html, '    <script src="https://sad.adsgram.ai/js/sad.min.js"></script>\n', '');
 
+// 1b) Обнуляем URL лидерборда: в Яндексе свой нативный лидерборд (yandex-inject.js),
+//     а VPS-топ/шаринг тут не нужны (CORS с origin Яндекса их всё равно не пустит).
+//     Пустой LEADERBOARD_URL прячет DOM-кнопки топа и выключает submit/share на VPS.
+html = must(html, "const LEADERBOARD_URL = 'https://api.keyfiregames.ru';", "const LEADERBOARD_URL = '';");
+
 // 2) Убираем preconnect к Google Fonts.
 html = must(html, '    <link rel="preconnect" href="https://fonts.googleapis.com">\n', '');
 html = must(html, '    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n', '');
