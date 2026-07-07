@@ -659,6 +659,7 @@
         if (isTelegram) {
             tg.ready();
             tg.expand();                                   // на весь экран
+            trackMetric('session_start');                  // метрика захода (DAU / удержание)
             if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();  // свайп по треку не сворачивает игру
             if (tg.setHeaderColor) tg.setHeaderColor('#05050f');
             if (tg.setBackgroundColor) tg.setBackgroundColor('#05050f');
@@ -970,6 +971,7 @@
             dailyStreak = dailyStreakToday();
             dailyLast = todayStr();
             saveDaily();
+            trackMetric('streak', dailyStreak);   // метрика: забор бонуса, value=длина серии
             return true;
         }
         // Применить стартовый бафф к текущему забегу (один раз в день; из startGame)
@@ -2687,12 +2689,12 @@
         // onSkip — при закрытии без награды.
         let adsgramController = null;
         const Ads = {
-            showRewarded(onReward, onSkip) {
+            showRewarded(onReward, onSkip, placement) {
                 // Adsgram (rewarded в Telegram): нужен ADSGRAM_BLOCK_ID + SDK в <head>
                 if (isTelegram && ADSGRAM_BLOCK_ID && window.Adsgram) {
                     if (!adsgramController) adsgramController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
                     adsgramController.show()
-                        .then(function() { onReward(); })
+                        .then(function() { trackMetric('ad_impression', null, { placement: placement }); onReward(); })
                         .catch(function() { if (onSkip) onSkip(); });
                     return;
                 }
@@ -2741,6 +2743,23 @@
             }).then(function(r) { return r.json(); }).then(function(d) {
                 if (d && d.ok) { myRank = d.rank; }
             }).catch(function() {});
+        }
+
+        // Метрика использования (тот же VPS, эндпоинт /event; бэкенд — games/leaderboard).
+        // Fire-and-forget: только в Telegram (нужен подписанный initData), ошибки глотаются —
+        // как submitScore(). keepalive — чтобы событие ушло даже при закрытии Mini App.
+        //   type=session_start — заход (DAU/удержание); ad_impression — показ рекламы
+        //   (meta.placement: revive|double); streak — забор бонуса (value=длина серии).
+        function trackMetric(type, value, meta) {
+            if (!LEADERBOARD_URL || !isTelegram || !tg.initData) return;
+            try {
+                fetch(LEADERBOARD_URL + '/event', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ game: GAME_SLUG, initData: tg.initData, type: type, value: value, meta: meta }),
+                    keepalive: true,
+                }).catch(function() {});
+            } catch (e) { /* сеть/приватность режут fetch — метрика некритична */ }
         }
 
         // Показать оверлей рейтинга и подтянуть топ.
@@ -3140,12 +3159,12 @@
         }
         reviveBtn.addEventListener('click', function() {
             initAudio();
-            Ads.showRewarded(revivePlayer, adUnavailable);
+            Ads.showRewarded(revivePlayer, adUnavailable, 'revive');
         });
         // Удвоить очки за рекламу
         doubleBtn.addEventListener('click', function() {
             initAudio();
-            Ads.showRewarded(doubleScore, adUnavailable);
+            Ads.showRewarded(doubleScore, adUnavailable, 'double');
         });
         shareBtn.addEventListener('click', shareScore);
 
