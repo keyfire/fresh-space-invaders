@@ -246,7 +246,7 @@
             display: none;
             position: absolute;
             z-index: 6;
-            top: 54%;
+            top: 60%;               /* ниже итогового текста (верхняя треть) – без наложения, п.1.10.3 */
             left: 50%;
             transform: translate(-50%, -50%);
             flex-direction: column;
@@ -1407,6 +1407,8 @@
             canvas.height = Math.round(cssH * dpr);
             computeLayout();
             rescaleEntities(oldW, oldH);
+            // Если открыт экран итога — пересчитать позицию стопки кнопок под новый холст.
+            if (document.body.classList.contains('state-over')) positionOverActions();
         }
 
         // ===== Звёздное небо =====
@@ -2561,14 +2563,17 @@
             ctx.textAlign = 'center';
             ctx.shadowColor = '#ff2b5e';
             ctx.shadowBlur = TEXT_GLOW_LARGE;
-            ctx.fillText(t('gameOver'), canvas.width / 2, canvas.height / 2 - bigSize * 2.2);
+            // Текст итога держим в верхней трети, чтобы он НЕ пересекался со стопкой
+            // кнопок (.over-actions, центр на 60% высоты) – п.1.10.3.
+            const overTop = canvas.height * 0.30;
+            ctx.fillText(t('gameOver'), canvas.width / 2, overTop);
             ctx.shadowBlur = 0;
             ctx.fillStyle = '#e8e8ff';
             ctx.font = `${smallSize}px ${FONT_FAMILY}`;
-            ctx.fillText(t('yourScore')(score), canvas.width / 2, canvas.height / 2 - bigSize * 0.6);
+            ctx.fillText(t('yourScore')(score), canvas.width / 2, overTop + bigSize * 1.6);
             ctx.fillStyle = '#ffd166';
             ctx.font = `${Math.round(smallSize * 0.82)}px ${FONT_FAMILY}`;
-            ctx.fillText(t('recordLine')(bestScore, bestLevel), canvas.width / 2, canvas.height / 2 - bigSize * 0.6 + smallSize * 1.4);
+            ctx.fillText(t('recordLine')(bestScore, bestLevel), canvas.width / 2, overTop + bigSize * 1.6 + smallSize * 1.5);
             ctx.textAlign = 'left';
         }
 
@@ -2584,7 +2589,9 @@
             ctx.fillStyle = '#ffd166';
             ctx.shadowColor = '#ff7c9c';
             ctx.shadowBlur = TEXT_GLOW_RECORD;
-            ctx.fillText(t('newRecord'), canvas.width / 2, canvas.height * 0.3);
+            // Выше заголовка «ИГРА ОКОНЧЕНА» (0.30h): при смерти вскоре после рекорда
+            // салют рисуется поверх экрана итога и не должен налезать на текст (п.1.10.3).
+            ctx.fillText(t('newRecord'), canvas.width / 2, canvas.height * 0.19);
             ctx.restore();
         }
 
@@ -2727,6 +2734,22 @@
             doubleBtn.style.display = (!usedDouble && score > 0) ? 'block' : 'none';
             shareBtn.style.display = (isTelegram || navigator.share) ? 'block' : 'none';
             lbBtnOver.style.display = LEADERBOARD_URL ? 'block' : 'none';
+            positionOverActions();
+        }
+
+        // Привязка стопки кнопок к геометрии холста. Текст итога (заголовок/счёт/
+        // рекорд) рисуется в координатах canvas в верхней трети, а кнопки абсолютны
+        // в .stage — без явной привязки их системы координат расходятся и на части
+        // экранов кнопки налезают на текст (это и поймала модерация, п.1.10.3).
+        // Ставим верх стопки на 0.47 высоты холста: текст кончается ~0.37h – зазор
+        // сохраняется на любом устройстве, кнопки растут вниз.
+        function positionOverActions() {
+            const oa = document.getElementById('overActions');
+            const parent = oa.offsetParent || document.body;
+            const pr = parent.getBoundingClientRect();
+            const cr = canvas.getBoundingClientRect();
+            oa.style.top = Math.round(cr.top - pr.top + cr.height * 0.47) + 'px';
+            oa.style.transform = 'translateX(-50%)';
         }
 
         // ===== Глобальный лидерборд (Cloudflare Worker + D1) =====
@@ -3183,18 +3206,28 @@
         window.addEventListener('resize', fitCanvas);
         window.addEventListener('orientationchange', function() { setTimeout(fitCanvas, 200); });
 
-        // Запуск единого цикла анимации
-        loadBest();
-        loadBestFromCloud();
-        loadDaily();
-        loadDailyFromCloud();
-        applyI18n();
-        refreshDailyButton();
-        if (!LEADERBOARD_URL) lbBtnMenu.style.display = 'none';   // топ не настроен — прячем кнопку
-        setUIState('menu');
-        fitCanvas();
-        lastTime = performance.now();
-        requestAnimationFrame(loop);
+        // Запуск единого цикла анимации. Обёрнут в startEngine(), чтобы сборка
+        // Яндекса могла отложить старт до инициализации SDK: язык из окружения
+        // применяется ДО первого кадра меню, а LoadingAPI.ready() вызывается ровно
+        // когда игра готова, а не после того как она уже играбельна (п.1.19, п.2.14).
+        function startEngine() {
+            loadBest();
+            loadBestFromCloud();
+            loadDaily();
+            loadDailyFromCloud();
+            applyI18n();
+            refreshDailyButton();
+            if (!LEADERBOARD_URL) lbBtnMenu.style.display = 'none';   // топ не настроен — прячем кнопку
+            setUIState('menu');
+            fitCanvas();
+            lastTime = performance.now();
+            requestAnimationFrame(loop);
+        }
+        // Обычные сборки (Telegram/Pages) стартуют сразу. В сборке Яндекса бутстрап
+        // в <head> ставит __yaDeferBoot – тогда старт вызывает yandex-inject.js после
+        // готовности SDK. Флаг проверяется здесь, до появления меню на экране.
+        if (window.__yaDeferBoot) { window.__startEngine = startEngine; }
+        else { startEngine(); }
     </script>
 </body>
 </html>

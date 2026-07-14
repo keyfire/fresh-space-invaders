@@ -21,22 +21,42 @@
         });
     }
 
-    // Вызывается из onload SDK-скрипта (<script async src="/sdk.js" onload="__initYaSDK()">)
+    // Старт движка отложен сборкой (__yaDeferBoot в <head>) до готовности SDK.
+    // startEngineOnce() применяет язык окружения и запускает игру ровно один раз —
+    // и только после этого игра становится играбельной (важно для п.1.19/п.2.14).
+    var engineStarted = false;
+    function startEngineOnce(lang) {
+        if (engineStarted) return;
+        engineStarted = true;
+        if (lang && SUPPORTED_LANGS.indexOf(lang) >= 0) { LANG = lang; }
+        if (typeof window.__startEngine === 'function') { window.__startEngine(); }
+    }
+
+    // Страховка: если SDK не поднялся (локальный прогон сборки без /sdk.js) —
+    // всё равно стартуем, чтобы не зависнуть на чёрном экране.
+    var bootFallback = setTimeout(function () { startEngineOnce(LANG); }, 4000);
+
+    // Вызывается из onload SDK-скрипта (<script async src="/sdk.js" onload="__initYaSDK()">).
+    // Идемпотентна: при гонке загрузки /sdk.js её дополнительно дёргает само-проверка ниже.
+    var sdkInitStarted = false;
     window.__initYaSDK = function () {
-        if (typeof YaGames === 'undefined') return;
+        if (sdkInitStarted || typeof YaGames === 'undefined') return;
+        sdkInitStarted = true;
         YaGames.init().then(function (sdk) {
             ysdk = sdk;
             window.ysdk = sdk;
-            // Язык из окружения Яндекса — чтобы игра переключалась вместе с интерфейсом
-            // Яндекса (модерация проверяет каждый заявленный язык через SDK).
+            // Язык из окружения Яндекса применяем ДО первого кадра меню, затем стартуем
+            // движок — так первый экран сразу на нужном языке (модерация проверяет
+            // каждый заявленный язык через SDK; п.2.14).
+            var yl = '';
             try {
-                var yl = sdk.environment && sdk.environment.i18n && sdk.environment.i18n.lang;
-                if (yl) {
-                    yl = String(yl).toLowerCase().split('-')[0];
-                    if (SUPPORTED_LANGS.indexOf(yl) >= 0 && yl !== LANG) { LANG = yl; applyI18n(); }
-                }
-            } catch (e) {}
+                yl = (sdk.environment && sdk.environment.i18n && sdk.environment.i18n.lang) || '';
+                yl = String(yl).toLowerCase().split('-')[0];
+            } catch (e) { yl = ''; }
+            clearTimeout(bootFallback);
+            startEngineOnce(yl);
             // Обязательно: сообщаем платформе, что игра загрузилась и готова к игре.
+            // Вызывается сразу после старта движка — раньше игра недоступна для играния (п.1.19).
             try { if (sdk.features && sdk.features.LoadingAPI) sdk.features.LoadingAPI.ready(); } catch (e) {}
 
             // Rewarded-реклама Яндекса вместо Adsgram (кнопки «Продолжить» и «×2 очки»).
@@ -62,8 +82,16 @@
                 }).catch(function () {});
                 loadTop(true);
             }).catch(function () {});
-        }).catch(function () {});
+        }).catch(function () {
+            // Инициализация SDK не удалась — всё равно стартуем игру без облачных функций.
+            clearTimeout(bootFallback);
+            startEngineOnce(LANG);
+        });
     };
+
+    // Если /sdk.js успел загрузиться до объявления __initYaSDK (гонка async-скрипта),
+    // его onload мог не застать обработчик — дёргаем инициализацию вручную.
+    if (typeof YaGames !== 'undefined') { window.__initYaSDK(); }
 
     // Отправка рекорда в лидерборд — оборачиваем существующий saveBest().
     var _saveBest = saveBest;

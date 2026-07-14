@@ -60,7 +60,9 @@ html = must(html, '    <link rel="preconnect" href="https://fonts.gstatic.com" c
 
 // 3) Ссылку на Google Fonts заменяем на Яндекс-SDK + вшитый шрифт.
 const headBlock =
-    '    <!-- Yandex Games SDK -->\n'
+    '    <!-- Старт движка откладывается до готовности SDK: язык окружения + LoadingAPI.ready() до играбельности (п.1.19, п.2.14) -->\n'
+    + '    <script>window.__yaDeferBoot=true;</script>\n'
+    + '    <!-- Yandex Games SDK -->\n'
     + '    <script async src="/sdk.js" onload="__initYaSDK()"></script>\n'
     + '    <style>\n' + fontFaceCss() + '\n    </style>';
 html = must(html, '    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">', headBlock);
