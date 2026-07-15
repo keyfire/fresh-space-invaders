@@ -1,0 +1,15 @@
+{
+  "advertisement": {
+    "minimumDelayBetweenInterstitial": 0,
+    "initialInterstitialDelay": 0,
+    "interstitial": {
+      "placementFallback": "game_over",
+      "placements": [{ "id": "game_over" }]
+    },
+    "rewarded": {
+      "placementFallback": "reward",
+      "placements": [{ "id": "reward" }]
+    }
+  },
+  "leaderboards": [{ "id": "main" }]
+}
