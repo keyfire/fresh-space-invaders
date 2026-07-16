@@ -23,3 +23,6 @@ tmp/
 yandex-build/
 playgama-build/
 *.zip
+
+# Temp-генератор обложек (одноразовый, заменён games/_yazhukicover*.mjs в passive-money)
+_covergen.html
